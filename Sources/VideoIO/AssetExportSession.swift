@@ -287,7 +287,7 @@ public class AssetExportSession {
     
     public func resume() {
         guard self.status == .paused && self.cancelled == false else {
-            assertionFailure("self.status == .exporting && self.cancelled == false")
+            assertionFailure("self.status == .paused && self.cancelled == false")
             return
         }
         self.status = .exporting
