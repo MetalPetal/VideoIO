@@ -88,8 +88,8 @@ public class AssetExportSession {
         public var audioMix: AVAudioMix?
         
         public init(rawVideoSettings: [String: Any], rawAudioSettings: [String: Any]) {
-            self.videoSettings = videoSettings
-            self.audioSettings = audioSettings
+            self.videoSettings = rawVideoSettings
+            self.audioSettings = rawAudioSettings
         }
         
         public init(videoSettings: VideoSettings, audioSettings: AudioSettings) {
