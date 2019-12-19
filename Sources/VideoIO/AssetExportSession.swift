@@ -92,9 +92,9 @@ public class AssetExportSession {
             self.audioSettings = audioSettings
         }
         
-        public init(videoSettings: VideoSettings, audioSettings: AudioSettings) {
-            self.videoSettings = videoSettings.toDictionary()
-            self.audioSettings = audioSettings.toDictionary()
+        public init(settings: (video: VideoSettings, audio: AudioSettings)) {
+            self.videoSettings = settings.video.toDictionary()
+            self.audioSettings = settings.audio.toDictionary()
         }
     }
     
