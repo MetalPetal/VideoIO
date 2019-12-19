@@ -131,6 +131,6 @@ public class VideoComposition<Compositor> where Compositor: VideoCompositorProto
 extension VideoComposition where Compositor == BlockBasedVideoCompositor {
     public convenience init(propertiesOf asset: AVAsset, compositionRequestHandler: @escaping (AVAsynchronousVideoCompositionRequest) -> Void) {
         self.init(propertiesOf: asset)
-        self.instructions = [.init(handler: compositionRequestHandler, timeRange: CMTimeRange(start: .zero, duration: CMTime(seconds: 86400, preferredTimescale: 48000)))]
+        self.instructions = [.init(handler: compositionRequestHandler, timeRange: CMTimeRange(start: .zero, duration: CMTime(value: CMTimeValue.max, timescale: 48000)))]
     }
 }
