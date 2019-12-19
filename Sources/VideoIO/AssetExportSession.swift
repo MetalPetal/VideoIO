@@ -10,66 +10,66 @@ import AVFoundation
 
 public class AssetExportSession {
     
-    public struct Configuration {
-        
-        public struct VideoSettings {
-            public struct CompressionProperties {
-                public var bitRate: Int
-                public var profileLevel: String
-                
-                public init(bitRate: Int, profileLevel: String) {
-                    self.bitRate = bitRate
-                    self.profileLevel = profileLevel
-                }
-            }
-            public var width: Int
-            public var height: Int
-            public var codec: AVVideoCodecType
-            public var compressionProperties: CompressionProperties
-            
-            public init(size: CGSize, codec: AVVideoCodecType, compressionProperties: CompressionProperties) {
-                self.width = Int(size.width)
-                self.height = Int(size.height)
-                self.codec = codec
-                self.compressionProperties = compressionProperties
-            }
-            
-            public func toDictionary() -> [String: Any] {
-                return [
-                    AVVideoWidthKey: width,
-                    AVVideoHeightKey: height,
-                    AVVideoCodecKey: codec,
-                    AVVideoCompressionPropertiesKey: [
-                        AVVideoAverageBitRateKey: compressionProperties.bitRate,
-                        AVVideoProfileLevelKey: compressionProperties.profileLevel
-                    ]
-                ]
-            }
-        }
-        
-        public struct AudioSettings {
-            
-            public var formatID: AudioFormatID
-            public var numberOfChannels: Int
-            public var sampleRate: Double
+    public struct VideoSettings {
+        public struct CompressionProperties {
             public var bitRate: Int
+            public var profileLevel: String
             
-            public init(formatID: AudioFormatID, channels: Int, sampleRate: Double, bitRate: Int) {
-                self.formatID = formatID
-                self.numberOfChannels = channels
-                self.sampleRate = sampleRate
+            public init(bitRate: Int, profileLevel: String) {
                 self.bitRate = bitRate
-            }
-            
-            public func toDictionary() -> [String: Any] {
-                return [
-                    AVFormatIDKey: formatID,
-                    AVNumberOfChannelsKey: numberOfChannels,
-                    AVSampleRateKey: sampleRate,
-                    AVEncoderBitRateKey: bitRate
-                ]
+                self.profileLevel = profileLevel
             }
         }
+        public var width: Int
+        public var height: Int
+        public var codec: AVVideoCodecType
+        public var compressionProperties: CompressionProperties
+        
+        public init(size: CGSize, codec: AVVideoCodecType, compressionProperties: CompressionProperties) {
+            self.width = Int(size.width)
+            self.height = Int(size.height)
+            self.codec = codec
+            self.compressionProperties = compressionProperties
+        }
+        
+        public func toDictionary() -> [String: Any] {
+            return [
+                AVVideoWidthKey: width,
+                AVVideoHeightKey: height,
+                AVVideoCodecKey: codec,
+                AVVideoCompressionPropertiesKey: [
+                    AVVideoAverageBitRateKey: compressionProperties.bitRate,
+                    AVVideoProfileLevelKey: compressionProperties.profileLevel
+                ]
+            ]
+        }
+    }
+    
+    public struct AudioSettings {
+        
+        public var formatID: AudioFormatID
+        public var numberOfChannels: Int
+        public var sampleRate: Double
+        public var bitRate: Int
+        
+        public init(formatID: AudioFormatID, channels: Int, sampleRate: Double, bitRate: Int) {
+            self.formatID = formatID
+            self.numberOfChannels = channels
+            self.sampleRate = sampleRate
+            self.bitRate = bitRate
+        }
+        
+        public func toDictionary() -> [String: Any] {
+            return [
+                AVFormatIDKey: formatID,
+                AVNumberOfChannelsKey: numberOfChannels,
+                AVSampleRateKey: sampleRate,
+                AVEncoderBitRateKey: bitRate
+            ]
+        }
+    }
+    
+    public struct Configuration {
         
         public var fileType: AVFileType = .mp4
         
@@ -87,14 +87,14 @@ public class AssetExportSession {
         
         public var audioMix: AVAudioMix?
         
-        public init(videoSettings: [String: Any], audioSettings: [String: Any]) {
+        public init(rawVideoSettings: [String: Any], rawAudioSettings: [String: Any]) {
             self.videoSettings = videoSettings
             self.audioSettings = audioSettings
         }
         
-        public init(settings: (video: VideoSettings, audio: AudioSettings)) {
-            self.videoSettings = settings.video.toDictionary()
-            self.audioSettings = settings.audio.toDictionary()
+        public init(videoSettings: VideoSettings, audioSettings: AudioSettings) {
+            self.videoSettings = videoSettings.toDictionary()
+            self.audioSettings = audioSettings.toDictionary()
         }
     }
     
