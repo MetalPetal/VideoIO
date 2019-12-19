@@ -310,4 +310,10 @@ public class AssetExportSession {
             self.writer.cancelWriting()
         }
     }
+    
+    deinit {
+        if self.status == .paused {
+            self.pauseDispatchGroup.leave()
+        }
+    }
 }
