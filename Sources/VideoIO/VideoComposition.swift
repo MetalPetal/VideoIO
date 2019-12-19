@@ -122,6 +122,9 @@ public class VideoComposition<Compositor> where Compositor: VideoCompositorProto
         self.asset = asset.copy() as! AVAsset
         self.videoComposition = AVMutableVideoComposition(propertiesOf: self.asset)
         self.videoComposition.customVideoCompositorClass = Compositor.self
+        if let presentationVideoSize = self.asset.presentationVideoSize {
+            self.renderSize = presentationVideoSize
+        }
     }
 }
 
