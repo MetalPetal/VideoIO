@@ -19,7 +19,7 @@ public class AssetExportSession {
         
         public var audioSettings: [String: Any]
         
-        public var timeRange: CMTimeRange = .invalid
+        public var timeRange: CMTimeRange = CMTimeRange(start: .zero, duration: .positiveInfinity)
         
         public var metadata: [AVMetadataItem] = []
         
