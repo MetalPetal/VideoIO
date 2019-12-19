@@ -11,21 +11,26 @@ import AVFoundation
 public class AssetExportSession {
     
     public struct Configuration {
-        var fileType: AVFileType = .mp4
+        public var fileType: AVFileType = .mp4
         
-        var shouldOptimizeForNetworkUse: Bool = true
+        public var shouldOptimizeForNetworkUse: Bool = true
         
-        var videoSettings: [String: Any]
+        public var videoSettings: [String: Any]
         
-        var audioSettings: [String: Any]
+        public var audioSettings: [String: Any]
         
-        var timeRange: CMTimeRange
+        public var timeRange: CMTimeRange = .invalid
         
-        var metadata: [AVMetadataItem] = []
+        public var metadata: [AVMetadataItem] = []
         
-        var videoComposition: AVVideoComposition?
+        public var videoComposition: AVVideoComposition?
         
-        var audioMix: AVAudioMix?
+        public var audioMix: AVAudioMix?
+        
+        public init(videoSettings: [String: Any], audioSettings: [String: Any]) {
+            self.videoSettings = videoSettings
+            self.audioSettings = audioSettings
+        }
     }
     
     public enum Status {
