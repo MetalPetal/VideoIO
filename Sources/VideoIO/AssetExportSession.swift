@@ -12,7 +12,7 @@ public class AssetExportSession {
     
     public struct Configuration {
         
-        public var fileType: AVFileType = .mp4
+        public var fileType: AVFileType
         
         public var shouldOptimizeForNetworkUse: Bool = true
         
@@ -28,12 +28,14 @@ public class AssetExportSession {
         
         public var audioMix: AVAudioMix?
         
-        public init(rawVideoSettings: [String: Any], rawAudioSettings: [String: Any]) {
+        public init(fileType: AVFileType, rawVideoSettings: [String: Any], rawAudioSettings: [String: Any]) {
+            self.fileType = fileType
             self.videoSettings = rawVideoSettings
             self.audioSettings = rawAudioSettings
         }
         
-        public init(videoSettings: VideoSettings, audioSettings: AudioSettings) {
+        public init(fileType: AVFileType, videoSettings: VideoSettings, audioSettings: AudioSettings) {
+            self.fileType = fileType
             self.videoSettings = videoSettings.toDictionary()
             self.audioSettings = audioSettings.toDictionary()
         }
