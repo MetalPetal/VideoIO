@@ -10,68 +10,9 @@ import AVFoundation
 
 public class AssetExportSession {
     
-    public struct VideoSettings {
-        public struct CompressionProperties {
-            public var bitRate: Int
-            public var profileLevel: String
-            
-            public init(bitRate: Int, profileLevel: String) {
-                self.bitRate = bitRate
-                self.profileLevel = profileLevel
-            }
-        }
-        public var width: Int
-        public var height: Int
-        public var codec: AVVideoCodecType
-        public var compressionProperties: CompressionProperties
-        
-        public init(size: CGSize, codec: AVVideoCodecType, compressionProperties: CompressionProperties) {
-            self.width = Int(size.width)
-            self.height = Int(size.height)
-            self.codec = codec
-            self.compressionProperties = compressionProperties
-        }
-        
-        public func toDictionary() -> [String: Any] {
-            return [
-                AVVideoWidthKey: width,
-                AVVideoHeightKey: height,
-                AVVideoCodecKey: codec,
-                AVVideoCompressionPropertiesKey: [
-                    AVVideoAverageBitRateKey: compressionProperties.bitRate,
-                    AVVideoProfileLevelKey: compressionProperties.profileLevel
-                ]
-            ]
-        }
-    }
-    
-    public struct AudioSettings {
-        
-        public var formatID: AudioFormatID
-        public var numberOfChannels: Int
-        public var sampleRate: Double
-        public var bitRate: Int
-        
-        public init(formatID: AudioFormatID, channels: Int, sampleRate: Double, bitRate: Int) {
-            self.formatID = formatID
-            self.numberOfChannels = channels
-            self.sampleRate = sampleRate
-            self.bitRate = bitRate
-        }
-        
-        public func toDictionary() -> [String: Any] {
-            return [
-                AVFormatIDKey: formatID,
-                AVNumberOfChannelsKey: numberOfChannels,
-                AVSampleRateKey: sampleRate,
-                AVEncoderBitRateKey: bitRate
-            ]
-        }
-    }
-    
     public struct Configuration {
         
-        public var fileType: AVFileType = .mp4
+        public var fileType: AVFileType
         
         public var shouldOptimizeForNetworkUse: Bool = true
         
@@ -87,12 +28,14 @@ public class AssetExportSession {
         
         public var audioMix: AVAudioMix?
         
-        public init(rawVideoSettings: [String: Any], rawAudioSettings: [String: Any]) {
+        public init(fileType: AVFileType, rawVideoSettings: [String: Any], rawAudioSettings: [String: Any]) {
+            self.fileType = fileType
             self.videoSettings = rawVideoSettings
             self.audioSettings = rawAudioSettings
         }
         
-        public init(videoSettings: VideoSettings, audioSettings: AudioSettings) {
+        public init(fileType: AVFileType, videoSettings: VideoSettings, audioSettings: AudioSettings) {
+            self.fileType = fileType
             self.videoSettings = videoSettings.toDictionary()
             self.audioSettings = audioSettings.toDictionary()
         }
@@ -163,7 +106,15 @@ public class AssetExportSession {
                 videoCompositionOutput.videoComposition = configuration.videoComposition
                 videoOutput = videoCompositionOutput
             } else {
-                videoOutput = AVAssetReaderTrackOutput(track: videoTracks.first!, outputSettings: nil)
+                if #available(iOS 13.0, macOS 10.15, *) {
+                    if videoTracks.first!.hasMediaCharacteristic(.containsAlphaChannel) {
+                        videoOutput = AVAssetReaderTrackOutput(track: videoTracks.first!, outputSettings: [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA])
+                    } else {
+                        videoOutput = AVAssetReaderTrackOutput(track: videoTracks.first!, outputSettings: [kCVPixelBufferPixelFormatTypeKey as String: [kCVPixelFormatType_420YpCbCr8BiPlanarFullRange, kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange]])
+                    }
+                } else {
+                    videoOutput = AVAssetReaderTrackOutput(track: videoTracks.first!, outputSettings: [kCVPixelBufferPixelFormatTypeKey as String: [kCVPixelFormatType_420YpCbCr8BiPlanarFullRange, kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange]])
+                }
                 videoOutput.alwaysCopiesSampleData = false
             }
             if self.reader.canAdd(videoOutput) {
