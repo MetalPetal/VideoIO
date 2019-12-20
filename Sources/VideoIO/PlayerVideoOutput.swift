@@ -10,6 +10,7 @@ import AVFoundation
 import CoreImage
 
 @available(iOS 10.0, *)
+@available(macOS, unavailable)
 public class PlayerVideoOutput: NSObject {
     
     public struct Configuration {
@@ -210,6 +211,7 @@ public class PlayerVideoOutput: NSObject {
 }
 
 @available(iOS 10.0, *)
+@available(macOS, unavailable)
 extension PlayerVideoOutput: AVPlayerItemOutputPullDelegate {
     public func outputMediaDataWillChange(_ sender: AVPlayerItemOutput) {
         self.displayLink?.isPaused = false
