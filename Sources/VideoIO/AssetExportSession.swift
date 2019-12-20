@@ -104,10 +104,14 @@ public class AssetExportSession {
                 videoCompositionOutput.videoComposition = configuration.videoComposition
                 videoOutput = videoCompositionOutput
             } else {
-                if videoTracks.first!.hasMediaCharacteristic(.containsAlphaChannel) {
-                    videoOutput = AVAssetReaderTrackOutput(track: videoTracks.first!, outputSettings: [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA])
+                if #available(iOS 13.0, *) {
+                    if videoTracks.first!.hasMediaCharacteristic(.containsAlphaChannel) {
+                        videoOutput = AVAssetReaderTrackOutput(track: videoTracks.first!, outputSettings: [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA])
+                    } else {
+                        videoOutput = AVAssetReaderTrackOutput(track: videoTracks.first!, outputSettings: [kCVPixelBufferPixelFormatTypeKey as String: [kCVPixelFormatType_420YpCbCr8BiPlanarFullRange, kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange]])
+                    }
                 } else {
-                    videoOutput = AVAssetReaderTrackOutput(track: videoTracks.first!, outputSettings: [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_420YpCbCr8BiPlanarFullRange])
+                    videoOutput = AVAssetReaderTrackOutput(track: videoTracks.first!, outputSettings: [kCVPixelBufferPixelFormatTypeKey as String: [kCVPixelFormatType_420YpCbCr8BiPlanarFullRange, kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange]])
                 }
                 videoOutput.alwaysCopiesSampleData = false
             }
