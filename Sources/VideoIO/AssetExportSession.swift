@@ -104,7 +104,7 @@ public class AssetExportSession {
                 videoCompositionOutput.videoComposition = configuration.videoComposition
                 videoOutput = videoCompositionOutput
             } else {
-                videoOutput = AVAssetReaderTrackOutput(track: videoTracks.first!, outputSettings: nil)
+                videoOutput = AVAssetReaderTrackOutput(track: videoTracks.first!, outputSettings: [kCVPixelBufferPixelFormatTypeKey: kCVPixelFormatType_420YpCbCr8BiPlanarFullRange])
                 videoOutput.alwaysCopiesSampleData = false
             }
             if self.reader.canAdd(videoOutput) {
