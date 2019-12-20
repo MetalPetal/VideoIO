@@ -13,16 +13,16 @@ import CoreImage
 public class PlayerVideoOutput: NSObject {
     
     public struct Configuration {
-        var sourcePixelBufferAttributes: [String: Any]?
-        var preferredFramesPerSecond: Int = 30
+        public var sourcePixelBufferAttributes: [String: Any]?
+        public var preferredFramesPerSecond: Int = 30
         public static let `default` = Configuration()
     }
     
     public struct VideoFrame {
-        var preferredTrackTransform: CGAffineTransform
-        var presentationTimestamp: CMTime
-        var playerTimestamp: CMTime
-        var pixelBuffer: CVPixelBuffer
+        public var preferredTrackTransform: CGAffineTransform
+        public var presentationTimestamp: CMTime
+        public var playerTimestamp: CMTime
+        public var pixelBuffer: CVPixelBuffer
     }
     
     public var configuration = Configuration() {
