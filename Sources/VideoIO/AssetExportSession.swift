@@ -104,7 +104,11 @@ public class AssetExportSession {
                 videoCompositionOutput.videoComposition = configuration.videoComposition
                 videoOutput = videoCompositionOutput
             } else {
-                videoOutput = AVAssetReaderTrackOutput(track: videoTracks.first!, outputSettings: [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_420YpCbCr8BiPlanarFullRange])
+                if videoTracks.first!.hasMediaCharacteristic(.containsAlphaChannel) {
+                    videoOutput = AVAssetReaderTrackOutput(track: videoTracks.first!, outputSettings: [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA])
+                } else {
+                    videoOutput = AVAssetReaderTrackOutput(track: videoTracks.first!, outputSettings: [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_420YpCbCr8BiPlanarFullRange])
+                }
                 videoOutput.alwaysCopiesSampleData = false
             }
             if self.reader.canAdd(videoOutput) {

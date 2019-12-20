@@ -137,6 +137,15 @@ public struct VideoSettings: Codable {
         }
         return videoSettings
     }
+    
+    @available(iOS 13.0, macOS 10.15, *)
+    public static func hevcWithAlpha(videoSize: CGSize, averageBitRate: Int? = nil) -> Self {
+        var videoSettings = VideoSettings(size: videoSize, codec: .hevcWithAlpha)
+        if let averageBitRate = averageBitRate {
+            videoSettings.compressionProperties = CompressionProperties(averageBitRate: averageBitRate, profileLevel: kVTProfileLevel_HEVC_Main_AutoLevel as String)
+        }
+        return videoSettings
+    }
 }
 
 public struct AudioSettings: Codable {
