@@ -10,7 +10,7 @@ Wraps around `AVMutableVideoComposition` with custom video compositor. A `BlockB
 
 Export `AVAsset`s. With the ability to customize video/audio settings as well as `pause` / `resume`.
 
-## PlayerVideoSource
+## PlayerVideoOutput
 
 Output video buffers from `AVPlayer`.
 

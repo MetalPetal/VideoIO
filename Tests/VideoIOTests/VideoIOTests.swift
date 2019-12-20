@@ -2,6 +2,7 @@ import XCTest
 @testable import VideoIO
 import AVFoundation
 
+@available(iOS 10.0, *)
 final class VideoIOTests: XCTestCase {
     func testExample() {
         // This is an example of a functional test case.
@@ -18,6 +19,18 @@ final class VideoIOTests: XCTestCase {
         } else {
             // Fallback on earlier versions
         }
+        
+        /*
+        let player = AVPlayer(url: URL(fileURLWithPath: "/Users/yu.ao/Desktop/WeChatSight240.mp4"))
+        let playerOutput = PlayerVideoOutput(player: player, configuration: .default) { frame in
+            
+        }
+        player.play()
+        
+        while true {
+            RunLoop.main.run(until: Date.distantFuture)
+        }
+        */
     }
 
     static var allTests = [
