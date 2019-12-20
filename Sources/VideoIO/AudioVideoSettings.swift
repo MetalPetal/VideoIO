@@ -115,9 +115,14 @@ public struct VideoSettings: Codable {
         return try! JSONSerialization.jsonObject(with: data, options: []) as! [String: Any]
     }
     
-    @available(iOS 11.0, *)
     public static func h264(videoSize: CGSize, averageBitRate: Int? = nil) -> Self {
-        var videoSettings = VideoSettings(size: videoSize, codec: .h264)
+        let codec: AVVideoCodecType
+        if #available(iOS 11.0, *) {
+            codec = .h264
+        } else {
+            codec = AVVideoCodecType(rawValue: AVVideoCodecH264)
+        }
+        var videoSettings = VideoSettings(size: videoSize, codec: codec)
         if let averageBitRate = averageBitRate {
             videoSettings.compressionProperties = CompressionProperties(averageBitRate: averageBitRate, profileLevel: AVVideoProfileLevelH264HighAutoLevel)
         }
