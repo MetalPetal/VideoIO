@@ -187,7 +187,7 @@ public struct AudioSettings: Codable {
         return try! JSONSerialization.jsonObject(with: data, options: []) as! [String: Any]
     }
     
-    public static func acc(channels: Int, sampleRate: Double, bitRate: Int) -> Self {
+    public static func aac(channels: Int, sampleRate: Double, bitRate: Int) -> Self {
         var settings = AudioSettings(formatID: kAudioFormatMPEG4AAC, channels: channels, sampleRate: sampleRate)
         settings.bitRate = bitRate
         return settings
