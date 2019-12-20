@@ -106,7 +106,7 @@ public class AssetExportSession {
                 videoCompositionOutput.videoComposition = configuration.videoComposition
                 videoOutput = videoCompositionOutput
             } else {
-                if #available(iOS 13.0, *) {
+                if #available(iOS 13.0, macOS 10.15, *) {
                     if videoTracks.first!.hasMediaCharacteristic(.containsAlphaChannel) {
                         videoOutput = AVAssetReaderTrackOutput(track: videoTracks.first!, outputSettings: [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA])
                     } else {
