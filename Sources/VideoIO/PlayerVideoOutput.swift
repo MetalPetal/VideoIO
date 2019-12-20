@@ -7,7 +7,6 @@
 
 import Foundation
 import AVFoundation
-import CoreImage
 
 @available(iOS 10.0, *)
 @available(macOS, unavailable)
