@@ -13,7 +13,7 @@ final class VideoIOTests: XCTestCase {
         dump(audioSettings.toDictionary())
         
         if #available(iOS 11.0, *) {
-            var videoSettings = VideoSettings.hevc(videoSize: CGSize(width: 1920, height: 1080), averageBitRate: 5000 * 1000)
+            let videoSettings = VideoSettings.hevc(videoSize: CGSize(width: 1920, height: 1080), averageBitRate: 5000 * 1000)
             dump(videoSettings.toDictionary())
         } else {
             // Fallback on earlier versions
