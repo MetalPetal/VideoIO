@@ -350,13 +350,14 @@ public final class MovieRecorder {
                 if let err = error {
                     print("MovieRecorder error: \(err)")
                 }
+                
+            } else if newStatus == .recording {
+                shouldNotifyDelegate = true
             }
             
-        } else if newStatus == .recording {
-            shouldNotifyDelegate = true
             self.status = newStatus
         }
-        
+
         if shouldNotifyDelegate {
             callbackQueue.async {
                 autoreleasepool {
@@ -364,7 +365,7 @@ public final class MovieRecorder {
                     case .recording:
                         self.delegate?.movieRecorderDidFinishPreparing(self)
                     case .finished:
-                        self.delegate?.movieRecorderDidFinishPreparing(self)
+                        self.delegate?.movieRecorderDidFinishRecording(self)
                     case .failed:
                         if let err = error {
                             self.delegate?.movieRecorder(self, didFailWithError: err)
