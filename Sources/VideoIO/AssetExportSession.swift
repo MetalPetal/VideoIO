@@ -100,11 +100,13 @@ public class AssetExportSession {
         let videoTracks = asset.tracks(withMediaType: .video)
         if (videoTracks.count > 0) {
             let videoOutput: AVAssetReaderOutput
+            let inputTransform: CGAffineTransform?
             if configuration.videoComposition != nil {
                 let videoCompositionOutput = AVAssetReaderVideoCompositionOutput(videoTracks: videoTracks, videoSettings: nil)
                 videoCompositionOutput.alwaysCopiesSampleData = false
                 videoCompositionOutput.videoComposition = configuration.videoComposition
                 videoOutput = videoCompositionOutput
+                inputTransform = nil
             } else {
                 if #available(iOS 13.0, macOS 10.15, *) {
                     if videoTracks.first!.hasMediaCharacteristic(.containsAlphaChannel) {
@@ -116,6 +118,7 @@ public class AssetExportSession {
                     videoOutput = AVAssetReaderTrackOutput(track: videoTracks.first!, outputSettings: [kCVPixelBufferPixelFormatTypeKey as String: [kCVPixelFormatType_420YpCbCr8BiPlanarFullRange, kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange]])
                 }
                 videoOutput.alwaysCopiesSampleData = false
+                inputTransform = videoTracks.first!.preferredTransform
             }
             if self.reader.canAdd(videoOutput) {
                 self.reader.add(videoOutput)
@@ -124,7 +127,18 @@ public class AssetExportSession {
             }
             self.videoOutput = videoOutput
             
-            let videoInput = AVAssetWriterInput(mediaType: .video, outputSettings: configuration.videoSettings)
+            let videoInput: AVAssetWriterInput
+            if let transform = inputTransform {
+                let size = CGSize(width: configuration.videoSettings[AVVideoWidthKey] as! CGFloat, height: configuration.videoSettings[AVVideoHeightKey] as! CGFloat)
+                let transformedSize = size.applying(transform.inverted())
+                var videoSettings = configuration.videoSettings
+                videoSettings[AVVideoWidthKey] = abs(transformedSize.width)
+                videoSettings[AVVideoHeightKey] = abs(transformedSize.height)
+                videoInput = AVAssetWriterInput(mediaType: .video, outputSettings: videoSettings)
+                videoInput.transform = transform
+            } else {
+                videoInput = AVAssetWriterInput(mediaType: .video, outputSettings: configuration.videoSettings)
+            }
             videoInput.expectsMediaDataInRealTime = false
             if self.writer.canAdd(videoInput) {
                 self.writer.add(videoInput)
