@@ -151,13 +151,21 @@ public struct VideoSettings: Codable {
 public struct AudioSettings: Codable {
     
     public var formatID: AudioFormatID
-    public var numberOfChannels: Int
     public var sampleRate: Double
     public var bitRate: Int?
+    
+    public var numberOfChannels: Int?
+    public var channelLayout: Data?
     
     public init(formatID: AudioFormatID, channels: Int, sampleRate: Double) {
         self.formatID = formatID
         self.numberOfChannels = channels
+        self.sampleRate = sampleRate
+    }
+    
+    public init(formatID: AudioFormatID, channelLayout: Data, sampleRate: Double) {
+        self.formatID = formatID
+        self.channelLayout = channelLayout
         self.sampleRate = sampleRate
     }
     
@@ -178,21 +186,24 @@ public struct AudioSettings: Codable {
         public static let numberOfChannels = CodingKeys(AVNumberOfChannelsKey)
         public static let sampleRate = CodingKeys(AVSampleRateKey)
         public static let bitRate = CodingKeys(AVEncoderBitRateKey)
+        public static let channelLayout = CodingKeys(AVChannelLayoutKey)
     }
     
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(formatID, forKey: .formatID)
-        try container.encode(numberOfChannels, forKey: .numberOfChannels)
         try container.encode(sampleRate, forKey: .sampleRate)
+        try container.encodeIfPresent(channelLayout, forKey: .channelLayout)
+        try container.encodeIfPresent(numberOfChannels, forKey: .numberOfChannels)
         try container.encodeIfPresent(bitRate, forKey: .bitRate)
     }
     
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.formatID = try container.decode(AudioFormatID.self, forKey: .formatID)
-        self.numberOfChannels = try container.decode(Int.self, forKey: .numberOfChannels)
         self.sampleRate = try container.decode(Double.self, forKey: .sampleRate)
+        self.channelLayout = try container.decodeIfPresent(Data.self, forKey: .channelLayout)
+        self.numberOfChannels = try container.decode(Int.self, forKey: .numberOfChannels)
         self.bitRate = try container.decodeIfPresent(Int.self, forKey: .bitRate)
     }
     
@@ -201,8 +212,14 @@ public struct AudioSettings: Codable {
         return try! JSONSerialization.jsonObject(with: data, options: []) as! [String: Any]
     }
     
-    public static func aac(channels: Int, sampleRate: Double, bitRate: Int) -> Self {
+    public static func aac(channels: Int, sampleRate: Double, bitRate: Int?) -> Self {
         var settings = AudioSettings(formatID: kAudioFormatMPEG4AAC, channels: channels, sampleRate: sampleRate)
+        settings.bitRate = bitRate
+        return settings
+    }
+    
+    public static func aac(channelLayout: Data, sampleRate: Double, bitRate: Int?) -> Self {
+        var settings = AudioSettings(formatID: kAudioFormatMPEG4AAC, channelLayout: channelLayout, sampleRate: sampleRate)
         settings.bitRate = bitRate
         return settings
     }
