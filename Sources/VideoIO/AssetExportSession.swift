@@ -100,11 +100,13 @@ public class AssetExportSession {
         let videoTracks = asset.tracks(withMediaType: .video)
         if (videoTracks.count > 0) {
             let videoOutput: AVAssetReaderOutput
+            let inputTransform: CGAffineTransform?
             if configuration.videoComposition != nil {
                 let videoCompositionOutput = AVAssetReaderVideoCompositionOutput(videoTracks: videoTracks, videoSettings: nil)
                 videoCompositionOutput.alwaysCopiesSampleData = false
                 videoCompositionOutput.videoComposition = configuration.videoComposition
                 videoOutput = videoCompositionOutput
+                inputTransform = nil
             } else {
                 if #available(iOS 13.0, macOS 10.15, *) {
                     if videoTracks.first!.hasMediaCharacteristic(.containsAlphaChannel) {
@@ -116,6 +118,7 @@ public class AssetExportSession {
                     videoOutput = AVAssetReaderTrackOutput(track: videoTracks.first!, outputSettings: [kCVPixelBufferPixelFormatTypeKey as String: [kCVPixelFormatType_420YpCbCr8BiPlanarFullRange, kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange]])
                 }
                 videoOutput.alwaysCopiesSampleData = false
+                inputTransform = videoTracks.first!.preferredTransform
             }
             if self.reader.canAdd(videoOutput) {
                 self.reader.add(videoOutput)
@@ -126,6 +129,9 @@ public class AssetExportSession {
             
             let videoInput = AVAssetWriterInput(mediaType: .video, outputSettings: configuration.videoSettings)
             videoInput.expectsMediaDataInRealTime = false
+            if let transform = inputTransform {
+                videoInput.transform = transform
+            }
             if self.writer.canAdd(videoInput) {
                 self.writer.add(videoInput)
             } else {
