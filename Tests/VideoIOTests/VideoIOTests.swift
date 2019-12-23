@@ -2,6 +2,12 @@ import XCTest
 @testable import VideoIO
 import AVFoundation
 
+extension CMSampleTimingInfo: Equatable {
+    public static func == (lhs: CMSampleTimingInfo, rhs: CMSampleTimingInfo) -> Bool {
+        lhs.decodeTimeStamp == rhs.decodeTimeStamp && lhs.duration == rhs.duration && lhs.presentationTimeStamp == rhs.presentationTimeStamp
+    }
+}
+
 @available(iOS 10.0, macOS 10.13, *)
 final class VideoIOTests: XCTestCase {
     
@@ -39,9 +45,36 @@ final class VideoIOTests: XCTestCase {
         wait(for: [expectation], timeout: 10.0)
         try? fileManager.removeItem(at: tempURL)
     }
+    
+    func testSampleBufferUtilities() {
+        var oldPixelBuffer: CVPixelBuffer?
+        CVPixelBufferCreate(nil, 1280, 720, kCVPixelFormatType_32BGRA, [:] as CFDictionary, &oldPixelBuffer)
+        var oldFormatDescription: CMFormatDescription?
+        CMVideoFormatDescriptionCreateForImageBuffer(allocator: nil, imageBuffer: oldPixelBuffer!, formatDescriptionOut: &oldFormatDescription)
+        var timingInfo = CMSampleTimingInfo(duration: CMTime(seconds: 1.0/30.0, preferredTimescale: 44100), presentationTimeStamp: .zero, decodeTimeStamp: .invalid)
+
+        var newPixelBuffer: CVPixelBuffer?
+        CVPixelBufferCreate(nil, 1920, 1080, kCVPixelFormatType_32BGRA, [:] as CFDictionary, &newPixelBuffer)
+        
+        var oldSampleBuffer: CMSampleBuffer?
+        CMSampleBufferCreateReadyWithImageBuffer(allocator: nil, imageBuffer: oldPixelBuffer!, formatDescription: oldFormatDescription!, sampleTiming: &timingInfo, sampleBufferOut: &oldSampleBuffer)
+        
+        let buffer = SampleBufferUtilities.makeSampleBufferByReplacingImageBuffer(of: oldSampleBuffer!, with: newPixelBuffer!)
+        XCTAssert(CMSampleBufferGetImageBuffer(buffer!) === newPixelBuffer)
+        
+        
+        var t: CMSampleTimingInfo = CMSampleTimingInfo()
+        CMSampleBufferGetSampleTimingInfo(buffer!, at: 0, timingInfoOut: &t)
+        XCTAssert(t == timingInfo)
+        
+        var sampleBufferWithNoImage: CMSampleBuffer?
+        CMSampleBufferCreate(allocator: nil, dataBuffer: nil, dataReady: false, makeDataReadyCallback: nil, refcon: nil, formatDescription: nil, sampleCount: 0, sampleTimingEntryCount: 0, sampleTimingArray: nil, sampleSizeEntryCount: 0, sampleSizeArray: nil, sampleBufferOut: &sampleBufferWithNoImage)
+        XCTAssert(SampleBufferUtilities.makeSampleBufferByReplacingImageBuffer(of: sampleBufferWithNoImage!, with: newPixelBuffer!) == nil)
+    }
 
     static var allTests = [
         ("testAudioVideoSettings", testAudioVideoSettings),
         ("testVideoExport", testVideoExport),
+        ("testSampleBufferUtilities", testSampleBufferUtilities),
     ]
 }
