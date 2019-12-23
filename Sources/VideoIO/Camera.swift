@@ -163,7 +163,7 @@ public class Camera: NSObject {
     
     private var videoDataHandler: SampleBufferOutputDelegateHandler?
     
-    public func enableVideoDataOutput(on queue: DispatchQueue = .main, bufferOutputCallback: @escaping (CMSampleBuffer) -> Void, bufferDroppedCallback: ((CMSampleBuffer) -> Void)?) throws {
+    public func enableVideoDataOutput(on queue: DispatchQueue = .main, bufferOutputCallback: @escaping (CMSampleBuffer) -> Void, bufferDroppedCallback: ((CMSampleBuffer) -> Void)? = nil) throws {
         assert(self.videoDataOutput == nil)
         let handler = SampleBufferOutputDelegateHandler(bufferOutputCallback: bufferOutputCallback, bufferDroppedCallback: bufferDroppedCallback)
         self.videoDataHandler = handler
@@ -202,7 +202,7 @@ public class Camera: NSObject {
     
     private var audioDataHandler: SampleBufferOutputDelegateHandler?
 
-    public func enableAudioDataOutput(on queue: DispatchQueue = .main, bufferOutputCallback: @escaping (CMSampleBuffer) -> Void, bufferDroppedCallback: ((CMSampleBuffer) -> Void)?) throws {
+    public func enableAudioDataOutput(on queue: DispatchQueue = .main, bufferOutputCallback: @escaping (CMSampleBuffer) -> Void, bufferDroppedCallback: ((CMSampleBuffer) -> Void)? = nil) throws {
         self.captureSession.beginConfiguration()
         if self.audioDeviceInput == nil {
             if let device = AVCaptureDevice.default(for: .audio), let audioDeviceInput = try? AVCaptureDeviceInput(device: device) {
