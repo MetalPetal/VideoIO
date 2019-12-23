@@ -130,7 +130,7 @@ public final class MovieRecorder {
         
         statusLock.lock()
         defer { statusLock.unlock() }
-        if status.rawValue < Status.recording.rawValue {
+        if status.rawValue < Status.preparingToRecord.rawValue {
             assertionFailure("Not ready to record yet.")
             return
         }
