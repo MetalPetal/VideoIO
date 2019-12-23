@@ -11,29 +11,6 @@ import AVFoundation
 @available(iOS 10.0, macOS 10.15, *)
 public class Camera: NSObject {
     
-    private class SampleBufferOutputDelegateHandler: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate, AVCaptureAudioDataOutputSampleBufferDelegate {
-        
-        private let bufferOutputCallback: (CMSampleBuffer) -> Void
-        private let bufferDroppedCallback: ((CMSampleBuffer) -> Void)?
-        
-        public init(bufferOutputCallback: @escaping (CMSampleBuffer) -> Void, bufferDroppedCallback: ((CMSampleBuffer) -> Void)? = nil){
-            self.bufferOutputCallback = bufferOutputCallback
-            self.bufferDroppedCallback = bufferDroppedCallback
-        }
-        
-        public func captureOutput(_ output: AVCaptureOutput, didDrop sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
-            self.bufferDroppedCallback?(sampleBuffer)
-        }
-        
-        public func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
-            self.bufferOutputCallback(sampleBuffer)
-        }
-        
-        public static func bufferOutputCallback(_ callback: @escaping (CMSampleBuffer) -> Void) -> SampleBufferOutputDelegateHandler {
-            return SampleBufferOutputDelegateHandler(bufferOutputCallback: callback)
-        }
-    }
-    
     public enum Error: Swift.Error {
         case noDeviceFound
         case cannotAddInput
@@ -160,20 +137,16 @@ public class Camera: NSObject {
     }
     
     public private(set) var videoDataOutput: AVCaptureVideoDataOutput?
-    
-    private var videoDataHandler: SampleBufferOutputDelegateHandler?
-    
-    public func enableVideoDataOutput(on queue: DispatchQueue = .main, bufferOutputCallback: @escaping (CMSampleBuffer) -> Void, bufferDroppedCallback: ((CMSampleBuffer) -> Void)? = nil) throws {
+        
+    public func enableVideoDataOutput(on queue: DispatchQueue = .main, delegate: AVCaptureVideoDataOutputSampleBufferDelegate) throws {
         assert(self.videoDataOutput == nil)
-        let handler = SampleBufferOutputDelegateHandler(bufferOutputCallback: bufferOutputCallback, bufferDroppedCallback: bufferDroppedCallback)
-        self.videoDataHandler = handler
         self.captureSession.beginConfiguration()
         if let output = self.videoDataOutput {
             self.captureSession.removeOutput(output)
         }
         let videoDataOutput = AVCaptureVideoDataOutput()
         videoDataOutput.alwaysDiscardsLateVideoFrames = true
-        videoDataOutput.setSampleBufferDelegate(handler, queue: queue)
+        videoDataOutput.setSampleBufferDelegate(delegate, queue: queue)
         self.videoDataOutput = videoDataOutput
         if self.captureSession.canAddOutput(videoDataOutput) {
             self.captureSession.addOutput(videoDataOutput)
@@ -186,7 +159,6 @@ public class Camera: NSObject {
     
     public func disableVideoDataOutput() {
         self.captureSession.beginConfiguration()
-        self.videoDataHandler = nil
         if let output = self.videoDataOutput {
             self.captureSession.removeOutput(output)
         }
@@ -199,10 +171,8 @@ public class Camera: NSObject {
     }
     
     public private(set) var audioDataOutput: AVCaptureAudioDataOutput?
-    
-    private var audioDataHandler: SampleBufferOutputDelegateHandler?
 
-    public func enableAudioDataOutput(on queue: DispatchQueue = .main, bufferOutputCallback: @escaping (CMSampleBuffer) -> Void, bufferDroppedCallback: ((CMSampleBuffer) -> Void)? = nil) throws {
+    public func enableAudioDataOutput(on queue: DispatchQueue = .main, delegate: AVCaptureAudioDataOutputSampleBufferDelegate) throws {
         self.captureSession.beginConfiguration()
         if self.audioDeviceInput == nil {
             if let device = AVCaptureDevice.default(for: .audio), let audioDeviceInput = try? AVCaptureDeviceInput(device: device) {
@@ -215,14 +185,12 @@ public class Camera: NSObject {
                 throw Error.cannotAddInput
             }
         }
-        let handler = SampleBufferOutputDelegateHandler(bufferOutputCallback: bufferOutputCallback, bufferDroppedCallback: bufferDroppedCallback)
         assert(self.audioDataOutput == nil)
-        self.audioDataHandler = handler
         if let audioOutput = self.audioDataOutput {
             self.captureSession.removeOutput(audioOutput)
         }
         let audioDataOutput = AVCaptureAudioDataOutput()
-        audioDataOutput.setSampleBufferDelegate(handler, queue: queue)
+        audioDataOutput.setSampleBufferDelegate(delegate, queue: queue)
         if self.captureSession.canAddOutput(audioDataOutput) {
             self.captureSession.addOutput(audioDataOutput)
         } else {
@@ -234,7 +202,6 @@ public class Camera: NSObject {
     
     public func disableAudioDataOutput() {
         self.captureSession.beginConfiguration()
-        self.audioDataHandler = nil
         if let output = self.audioDataOutput {
             self.captureSession.removeOutput(output)
         }
@@ -265,18 +232,14 @@ public class Camera: NSObject {
     
     public private(set) var metadataOutput: AVCaptureMetadataOutput?
     
-    private var metadataOutputDelegateHandler: MetadataOutputDelegateHandler?
-    
-    public func enableMetadataOutput(for metadataObjectTypes: [AVMetadataObject.ObjectType], on queue: DispatchQueue = .main, callback: @escaping ([AVMetadataObject]) -> Void) throws {
+    public func enableMetadataOutput(for metadataObjectTypes: [AVMetadataObject.ObjectType], on queue: DispatchQueue = .main, delegate: AVCaptureMetadataOutputObjectsDelegate) throws {
         assert(self.metadataOutput == nil)
-        let handler = MetadataOutputDelegateHandler(callback: callback)
-        self.metadataOutputDelegateHandler = handler
         self.captureSession.beginConfiguration()
         if let output = self.metadataOutput {
             self.captureSession.removeOutput(output)
         }
         let output = AVCaptureMetadataOutput()
-        output.setMetadataObjectsDelegate(handler, queue: queue)
+        output.setMetadataObjectsDelegate(delegate, queue: queue)
         if self.captureSession.canAddOutput(output) {
             self.captureSession.addOutput(output)
         } else {
@@ -288,7 +251,6 @@ public class Camera: NSObject {
     }
     
     public func disableMetadataOutput() {
-        self.metadataOutputDelegateHandler = nil
         self.captureSession.beginConfiguration()
         if let output = self.metadataOutput {
             self.captureSession.removeOutput(output)
