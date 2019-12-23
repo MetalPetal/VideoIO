@@ -387,6 +387,7 @@ extension MovieSegmentsRecorder: MovieRecorderDelegate {
             statusLock.unlock()
             return
         }
+        transitionToStatus(.recording, error: nil)
         statusLock.unlock()
     }
 
@@ -435,7 +436,6 @@ extension MovieSegmentsRecorder: MovieRecorderDelegate {
     
     public func movieRecorder(_ recorder: MovieRecorder, didUpdateWithTotalDuration totalDuration: TimeInterval) {
         statusLock.lock()
-        self.recorder = nil
         if status != .recording {
             statusLock.unlock()
             return
