@@ -54,7 +54,7 @@ public final class MovieRecorder {
     private var status: Status = .idle
     private let statusLock = NSLock()
     
-    private let writingQueue = DispatchQueue(label: "com.meteor.movie-recorder")
+    private let writingQueue = DispatchQueue(label: "org.MetalPetal.VideoIO.MovieRecorder", autoreleaseFrequency: .workItem)
     
     public let url: URL
 
@@ -99,27 +99,25 @@ public final class MovieRecorder {
         statusLock.lock()
         defer { statusLock.unlock() }
         if status != .idle {
-            print("Already prepared, cannot prepare again")
+            assertionFailure("Already prepared, cannot prepare again")
             return
         }
         transitionToStatus(.preparingToRecord, error: nil)
 
         writingQueue.async {
-            autoreleasepool {
-                // AVAssetWriter will not write over an existing file.
-                try? FileManager.default.removeItem(at: self.url)
-                
-                do {
-                    self.assetWriter = try AVAssetWriter(url: self.url, fileType: .mp4)
-                    self.assetWriter?.metadata = self.metadata
-                    self.statusLock.lock()
-                    self.transitionToStatus(.recording, error: nil)
-                    self.statusLock.unlock()
-                } catch {
-                    self.statusLock.lock()
-                    self.transitionToStatus(.failed, error: error)
-                    self.statusLock.unlock()
-                }
+            // AVAssetWriter will not write over an existing file.
+            try? FileManager.default.removeItem(at: self.url)
+            
+            do {
+                self.assetWriter = try AVAssetWriter(url: self.url, fileType: .mp4)
+                self.assetWriter?.metadata = self.metadata
+                self.statusLock.lock()
+                self.transitionToStatus(.recording, error: nil)
+                self.statusLock.unlock()
+            } catch {
+                self.statusLock.lock()
+                self.transitionToStatus(.failed, error: error)
+                self.statusLock.unlock()
             }
         }
     }
@@ -133,113 +131,99 @@ public final class MovieRecorder {
         statusLock.lock()
         defer { statusLock.unlock() }
         if status.rawValue < Status.recording.rawValue {
-            print("Not ready to record yet")
+            assertionFailure("Not ready to record yet.")
             return
         }
         
         writingQueue.async {
-            
-            autoreleasepool {
-                
-                // From the client's perspective the movie recorder can asynchronously transition to an error state as the result of an append.
-                // Because of this we are lenient when samples are appended and we are no longer recording.
-                // Instead of throwing an exception we just release the sample buffers and return.
-                self.statusLock.lock()
-                if self.status.rawValue > Status.finishingRecordingPart1.rawValue {
-                    self.statusLock.unlock()
-                    return
-                }
+            // From the client's perspective the movie recorder can asynchronously transition to an error state as the result of an append.
+            // Because of this we are lenient when samples are appended and we are no longer recording.
+            // Instead of throwing an exception we just release the sample buffers and return.
+            self.statusLock.lock()
+            if self.status.rawValue > Status.finishingRecordingPart1.rawValue {
                 self.statusLock.unlock()
-
-                var err: Error?
-                
-                if mediaType == kCMMediaType_Video {
-                    if self.videoInput == nil {
-                        do {
-                            try self.setupAssetWriterVideoInput(formatDescription: formatDescription, videoOrientation: self.videoOrientation, settings: self.videoSettings)
-                        } catch {
-                            err = error
-                        }
+                return
+            }
+            self.statusLock.unlock()
+            
+            var err: Error?
+            
+            if mediaType == kCMMediaType_Video {
+                if self.videoInput == nil {
+                    do {
+                        try self.setupAssetWriterVideoInput(formatDescription: formatDescription, videoOrientation: self.videoOrientation, settings: self.videoSettings)
+                    } catch {
+                        err = error
                     }
-                } else if mediaType == kCMMediaType_Audio && self.audioEnabled {
-                    if self.audioInput == nil {
-                        do {
-                            try self.setupAssetWriterAudioInput(formatDescription: formatDescription, settings: self.audioSettings)
-                        } catch {
-                            err = error
-                        }
+                }
+            } else if mediaType == kCMMediaType_Audio && self.audioEnabled {
+                if self.audioInput == nil {
+                    do {
+                        try self.setupAssetWriterAudioInput(formatDescription: formatDescription, settings: self.audioSettings)
+                    } catch {
+                        err = error
                     }
-                } else {
-                    // ignore other meida types
-                    return
                 }
-                                
-                if let e = err {
-                    self.statusLock.lock()
-                    self.transitionToStatus(.failed, error: e)
-                    self.statusLock.unlock()
-                }
-
-                
-                let isAudioReady: Bool = self.audioEnabled ? self.audioInput != nil : true
-                
-                if err == nil && self.videoInput != nil && isAudioReady {
-                    
-                    if self.haveStartedSession == false && mediaType == kCMMediaType_Video {
-                        
-                        if let assetWriter = self.assetWriter {
-                            let success = assetWriter.startWriting()
-                            if !success {
-                                err = assetWriter.error
-                            }
-                            
-                            if let e = err {
-                                self.statusLock.lock()
-                                self.transitionToStatus(.failed, error: e)
-                                self.statusLock.unlock()
-                            }
-                            
-                            let presentationTime = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
-                            assetWriter.startSession(atSourceTime: presentationTime)
-                            
-                            self.videoSampleTime = .zero
-                            self.lastVideoSampleTime = presentationTime
-                            self.haveStartedSession = true
-                        }
-
-                    }
-                    
-                }
-                
-                let mediaInput = mediaType == kCMMediaType_Video ? self.videoInput : self.audioInput
-                
-                if let input = mediaInput, input.isReadyForMoreMediaData, self.haveStartedSession {
-                    
-                    if mediaType == kCMMediaType_Video {
-                        let success = input.append(sampleBuffer)
-                        if success {
-                            let presentationTime = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
-                            self.videoSampleTime = CMTimeAdd(self.videoSampleTime, CMTimeSubtract(presentationTime, self.lastVideoSampleTime))
-                            let duration = self.videoSampleTime.seconds
-                            self.callbackQueue.async {
-                                self.delegate?.movieRecorder(self, didUpdateWithTotalDuration: duration)
-                            }
-                            self.lastVideoSampleTime = presentationTime
-                        }
-                        
-                    } else if mediaType == kCMMediaType_Audio {
-                        self.tryToAppendLastAudioSampleBuffers()
-                        self.tryToAppendAudioSampleBuffer(sampleBuffer)
-                    }
-                    
-                } else {
-                    print("\(mediaType) input not ready for more media data, dropping buffer")
-                }
-                
+            } else {
+                // ignore other meida types
+                return
             }
             
+            if let e = err {
+                self.statusLock.lock()
+                self.transitionToStatus(.failed, error: e)
+                self.statusLock.unlock()
+            }
+            
+            let isAudioReady: Bool = self.audioEnabled ? self.audioInput != nil : true
+            
+            if err == nil && self.videoInput != nil && isAudioReady {
+                if self.haveStartedSession == false && mediaType == kCMMediaType_Video {
+                    if let assetWriter = self.assetWriter {
+                        let success = assetWriter.startWriting()
+                        if !success {
+                            err = assetWriter.error
+                        }
+                        
+                        if let e = err {
+                            self.statusLock.lock()
+                            self.transitionToStatus(.failed, error: e)
+                            self.statusLock.unlock()
+                        }
+                        
+                        let presentationTime = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
+                        assetWriter.startSession(atSourceTime: presentationTime)
+                        
+                        self.videoSampleTime = .zero
+                        self.lastVideoSampleTime = presentationTime
+                        self.haveStartedSession = true
+                    }
+                }
+            }
+            
+            let mediaInput = mediaType == kCMMediaType_Video ? self.videoInput : self.audioInput
+            
+            if let input = mediaInput, input.isReadyForMoreMediaData, self.haveStartedSession {
+                if mediaType == kCMMediaType_Video {
+                    let success = input.append(sampleBuffer)
+                    if success {
+                        let presentationTime = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
+                        self.videoSampleTime = CMTimeAdd(self.videoSampleTime, CMTimeSubtract(presentationTime, self.lastVideoSampleTime))
+                        let duration = self.videoSampleTime.seconds
+                        self.callbackQueue.async {
+                            self.delegate?.movieRecorder(self, didUpdateWithTotalDuration: duration)
+                        }
+                        self.lastVideoSampleTime = presentationTime
+                    }
+                    
+                } else if mediaType == kCMMediaType_Audio {
+                    self.tryToAppendLastAudioSampleBuffers()
+                    self.tryToAppendAudioSampleBuffer(sampleBuffer)
+                }
+            } else {
+                print("\(mediaType) input not ready for more media data, dropping buffer")
+            }
         }
-        
     }
 
     /// Asynchronous, might take several hundred milliseconds.
@@ -268,39 +252,36 @@ public final class MovieRecorder {
         }
         
         writingQueue.async {
-            autoreleasepool {
-                self.statusLock.lock()
-                // We may have transitioned to an error state as we appended inflight buffers. In that case there is nothing to do now.
-                if self.status != .finishingRecordingPart1 {
-                    self.statusLock.unlock()
-                    return
-                }
-                
-                // It is not safe to call -[AVAssetWriter finishWriting*] concurrently with -[AVAssetWriterInput appendSampleBuffer:]
-                // We transition to MovieRecorderStatusFinishingRecordingPart2 while on _writingQueue, which guarantees that no more buffers will be appended.
-                self.transitionToStatus(.finishingRecordingPart2, error: nil)
+            self.statusLock.lock()
+            // We may have transitioned to an error state as we appended inflight buffers. In that case there is nothing to do now.
+            if self.status != .finishingRecordingPart1 {
                 self.statusLock.unlock()
-
-                self.tryToAppendLastAudioSampleBuffers()
-                
-                if let assetWriter = self.assetWriter, assetWriter.status == .writing {
-                    assetWriter.finishWriting {
-                        self.statusLock.lock()
-                        if let error = assetWriter.error {
-                            self.transitionToStatus(.failed, error: error)
-                        } else {
-                            self.transitionToStatus(.finished, error: nil)
-                        }
-                        self.statusLock.unlock()
-                    }
-                } else {
+                return
+            }
+            
+            // It is not safe to call -[AVAssetWriter finishWriting*] concurrently with -[AVAssetWriterInput appendSampleBuffer:]
+            // We transition to MovieRecorderStatusFinishingRecordingPart2 while on _writingQueue, which guarantees that no more buffers will be appended.
+            self.transitionToStatus(.finishingRecordingPart2, error: nil)
+            self.statusLock.unlock()
+            
+            self.tryToAppendLastAudioSampleBuffers()
+            
+            if let assetWriter = self.assetWriter, assetWriter.status == .writing {
+                assetWriter.finishWriting {
                     self.statusLock.lock()
-                    self.transitionToStatus(.cancelled, error: MovieRecorderError.sessionDidNotStart)
+                    if let error = assetWriter.error {
+                        self.transitionToStatus(.failed, error: error)
+                    } else {
+                        self.transitionToStatus(.finished, error: nil)
+                    }
                     self.statusLock.unlock()
                 }
+            } else {
+                self.statusLock.lock()
+                self.transitionToStatus(.cancelled, error: MovieRecorderError.sessionDidNotStart)
+                self.statusLock.unlock()
             }
         }
-        
     }
 
     /// Asynchronous, might take several hundred milliseconds.
@@ -315,14 +296,12 @@ public final class MovieRecorder {
         }
         
         writingQueue.async {
-            autoreleasepool {
-                self.statusLock.lock()
-                if self.status == .finishingRecordingPart1 {
-                    self.assetWriter?.cancelWriting()
-                    self.transitionToStatus(.cancelled, error: nil)
-                }
-                self.statusLock.unlock()
+            self.statusLock.lock()
+            if self.status == .finishingRecordingPart1 {
+                self.assetWriter?.cancelWriting()
+                self.transitionToStatus(.cancelled, error: nil)
             }
+            self.statusLock.unlock()
         }
     }
     
@@ -360,22 +339,20 @@ public final class MovieRecorder {
 
         if shouldNotifyDelegate {
             callbackQueue.async {
-                autoreleasepool {
-                    switch newStatus {
-                    case .recording:
-                        self.delegate?.movieRecorderDidFinishPreparing(self)
-                    case .finished:
-                        self.delegate?.movieRecorderDidFinishRecording(self)
-                    case .failed:
-                        if let err = error {
-                            self.delegate?.movieRecorder(self, didFailWithError: err)
-                        }
-                    case .cancelled:
-                        self.delegate?.movieRecorderDidCancelRecording(self)
-                    default:
-                        assertionFailure("Unexpected recording status \(newStatus) for delegate callback")
-                        break
+                switch newStatus {
+                case .recording:
+                    self.delegate?.movieRecorderDidFinishPreparing(self)
+                case .finished:
+                    self.delegate?.movieRecorderDidFinishRecording(self)
+                case .failed:
+                    if let err = error {
+                        self.delegate?.movieRecorder(self, didFailWithError: err)
                     }
+                case .cancelled:
+                    self.delegate?.movieRecorderDidCancelRecording(self)
+                default:
+                    assertionFailure("Unexpected recording status \(newStatus) for delegate callback")
+                    break
                 }
             }
         }
@@ -397,42 +374,27 @@ public final class MovieRecorder {
             throw MovieRecorderError.cannotSetupInput
         }
         
+        let dimensions = CMVideoFormatDescriptionGetDimensions(formatDescription)
+        let size = CGSize(width: Int(dimensions.width), height: Int(dimensions.height))
+        let image = CIImage(color: CIColor(red: 0, green: 0, blue: 0)).cropped(to: CGRect(x: 0, y: 0, width: Int(dimensions.width), height: Int(dimensions.height)))
+        let transform = image.orientationTransform(forExifOrientation: videoOrientation)
         var videoSettings = settings
         if videoSettings.isEmpty {
-            print("No video settings provided, using default settings")
-            
-            videoSettings = [
-                AVVideoCodecKey : AVVideoCodecH264,
-                AVVideoWidthKey : 480,
-                AVVideoHeightKey : 480,
-                AVVideoScalingModeKey : AVVideoScalingModeResizeAspectFill,
-                AVVideoCompressionPropertiesKey: [
-                    AVVideoAverageBitRateKey : 1 * 1024 * 1024,
-                    AVVideoMaxKeyFrameIntervalKey : 30
-                ]
-            ]
+            videoSettings = VideoSettings.h264(videoSize: size).toDictionary()
         }
-        
         if assetWriter.canApply(outputSettings: videoSettings, forMediaType: .video) {
             let videoInput = AVAssetWriterInput(mediaType: .video, outputSettings: videoSettings, sourceFormatHint: formatDescription)
             videoInput.expectsMediaDataInRealTime = true
-            
-            let dimensions = CMVideoFormatDescriptionGetDimensions(formatDescription)
-            let image = CIImage(color: CIColor(red: 0, green: 0, blue: 0)).cropped(to: CGRect(x: 0, y: 0, width: Int(dimensions.width), height: Int(dimensions.height)))
-            
-            videoInput.transform = image.orientationTransform(forExifOrientation: videoOrientation)
-            
+            videoInput.transform = transform
             if assetWriter.canAdd(videoInput) {
                 assetWriter.add(videoInput)
                 self.videoInput = videoInput
             } else {
                 throw MovieRecorderError.cannotSetupInput
             }
-            
         } else {
             throw MovieRecorderError.cannotSetupInput
         }
-        
     }
     
     private func setupAssetWriterAudioInput(formatDescription: CMFormatDescription, settings: [String: Any]) throws {
@@ -442,12 +404,7 @@ public final class MovieRecorder {
         
         var audioSettings = settings
         if audioSettings.isEmpty {
-            print("No audio settings provided, using default settings")
-            
-            audioSettings = [
-                AVFormatIDKey : kAudioFormatMPEG4AAC,
-                AVEncoderBitRatePerChannelKey : 64 * 1024
-            ]
+            audioSettings = [AVFormatIDKey : kAudioFormatMPEG4AAC]
         }
         
         if let currentASBD = CMAudioFormatDescriptionGetStreamBasicDescription(formatDescription) {
