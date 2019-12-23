@@ -127,11 +127,19 @@ public class AssetExportSession {
             }
             self.videoOutput = videoOutput
             
-            let videoInput = AVAssetWriterInput(mediaType: .video, outputSettings: configuration.videoSettings)
-            videoInput.expectsMediaDataInRealTime = false
+            let videoInput: AVAssetWriterInput
             if let transform = inputTransform {
+                let size = CGSize(width: configuration.videoSettings[AVVideoWidthKey] as! CGFloat, height: configuration.videoSettings[AVVideoHeightKey] as! CGFloat)
+                let transformedSize = size.applying(transform.inverted())
+                var videoSettings = configuration.videoSettings
+                videoSettings[AVVideoWidthKey] = abs(transformedSize.width)
+                videoSettings[AVVideoHeightKey] = abs(transformedSize.height)
+                videoInput = AVAssetWriterInput(mediaType: .video, outputSettings: videoSettings)
                 videoInput.transform = transform
+            } else {
+                videoInput = AVAssetWriterInput(mediaType: .video, outputSettings: configuration.videoSettings)
             }
+            videoInput.expectsMediaDataInRealTime = false
             if self.writer.canAdd(videoInput) {
                 self.writer.add(videoInput)
             } else {
