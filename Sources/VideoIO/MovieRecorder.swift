@@ -39,7 +39,7 @@ public final class MovieRecorder {
     public struct Configuration {
         /// Set audio enabled `true` to record both video and audio.
         /// Set `false' to record video only. Default is `true` `
-        public var audioEnabled: Bool = true
+        public var isAudioEnabled: Bool = true
         
         public var metadata: [AVMetadataItem] = []
         
@@ -166,7 +166,7 @@ public final class MovieRecorder {
                         err = error
                     }
                 }
-            } else if mediaType == kCMMediaType_Audio && self.configuration.audioEnabled {
+            } else if mediaType == kCMMediaType_Audio && self.configuration.isAudioEnabled {
                 if self.audioInput == nil {
                     do {
                         try self.setupAssetWriterAudioInput(formatDescription: formatDescription, settings: self.configuration.audioSettings)
@@ -187,7 +187,7 @@ public final class MovieRecorder {
                 return
             }
             
-            let isAudioReady: Bool = self.configuration.audioEnabled ? self.audioInput != nil : true
+            let isAudioReady: Bool = self.configuration.isAudioEnabled ? self.audioInput != nil : true
             let isVideoReady: Bool = self.videoInput != nil
             
             guard isVideoReady && isAudioReady else {
