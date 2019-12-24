@@ -24,13 +24,10 @@ public protocol MovieRecorderDelegate: class {
 }
 
 public enum MovieRecorderError: LocalizedError {
-    case sessionDidNotStart
     case cannotSetupInput
     
     public var errorDescription: String? {
-        switch  self {
-        case .sessionDidNotStart:
-            return "session did not start"
+        switch self {
         case .cannotSetupInput:
             return "cannot setup asset writer input"
         }
@@ -39,6 +36,27 @@ public enum MovieRecorderError: LocalizedError {
 
 public final class MovieRecorder {
     
+    public struct Configuration {
+        /// Set audio enabled `true` to record both video and audio.
+        /// Set `false' to record video only. Default is `true` `
+        public var audioEnabled: Bool = true
+        
+        public var metadata: [AVMetadataItem] = []
+        
+        /// Exif Orientation
+        public var videoOrientation: Int32 = 0
+        
+        // You can use VideoSettings/VideoSettings API to create these dictionary.
+        public var videoSettings: [String: Any] = [:]
+        
+        // Audio sample rate and channel layout will be override by the recorder.
+        public var audioSettings: [String: Any] = [:]
+        
+        public init() {
+            
+        }
+    }
+
     /// internal state machine
     private enum Status: Int, Equatable {
         case idle = 0
@@ -52,7 +70,7 @@ public final class MovieRecorder {
     }
     
     private var status: Status = .idle
-    private let statusLock = NSLock()
+    private let statusLock = UnfairLock()
     
     private let writingQueue = DispatchQueue(label: "org.MetalPetal.VideoIO.MovieRecorder", autoreleaseFrequency: .workItem)
     
@@ -68,30 +86,21 @@ public final class MovieRecorder {
     
     private var audioSampleBufferQueue: [CMSampleBuffer] = []
     
-    public weak var delegate: MovieRecorderDelegate?
-    public var callbackQueue: DispatchQueue = .main
-    
-    public var metadata: [AVMetadataItem] = []
-    
-    /// Exif Orientation
-    public var videoOrientation: Int32 = 0
-    
-    
-    // You can use VideoSettings/VideoSettings API to create these dictionary.
-    public var videoSettings: [String: Any] = [:]
-    
-    // Audio sample rate and channel layout will be override by the recorder.
-    public var audioSettings: [String: Any] = [:]
-    
     public private(set) var duration: CMTime = .zero
+        
+    private let configuration: Configuration
     
-    /// Set audio enabled `true` to record both video and audio.
-    /// Set `false' to record video only. Default is `true` `
-    public var audioEnabled: Bool = true
+    private weak var delegate: MovieRecorderDelegate?
+    private let callbackQueue: DispatchQueue
+    
+    private var error: Error?
     
     /// Init with target URL
-    public init(url: URL) {
+    public init(url: URL, configuration: Configuration = Configuration(), delegate: MovieRecorderDelegate, delegateQueue: DispatchQueue = .main) {
         self.url = url
+        self.configuration = configuration
+        self.callbackQueue = delegateQueue
+        self.delegate = delegate
     }
     
     /// Asynchronous, might take several hundred milliseconds.
@@ -111,7 +120,7 @@ public final class MovieRecorder {
             
             do {
                 self.assetWriter = try AVAssetWriter(url: self.url, fileType: .mp4)
-                self.assetWriter?.metadata = self.metadata
+                self.assetWriter?.metadata = self.configuration.metadata
                 self.statusLock.lock()
                 self.transitionToStatus(.recording, error: nil)
                 self.statusLock.unlock()
@@ -152,15 +161,15 @@ public final class MovieRecorder {
             if mediaType == kCMMediaType_Video {
                 if self.videoInput == nil {
                     do {
-                        try self.setupAssetWriterVideoInput(formatDescription: formatDescription, videoOrientation: self.videoOrientation, settings: self.videoSettings)
+                        try self.setupAssetWriterVideoInput(formatDescription: formatDescription, videoOrientation: self.configuration.videoOrientation, settings: self.configuration.videoSettings)
                     } catch {
                         err = error
                     }
                 }
-            } else if mediaType == kCMMediaType_Audio && self.audioEnabled {
+            } else if mediaType == kCMMediaType_Audio && self.configuration.audioEnabled {
                 if self.audioInput == nil {
                     do {
-                        try self.setupAssetWriterAudioInput(formatDescription: formatDescription, settings: self.audioSettings)
+                        try self.setupAssetWriterAudioInput(formatDescription: formatDescription, settings: self.configuration.audioSettings)
                     } catch {
                         err = error
                     }
@@ -178,7 +187,7 @@ public final class MovieRecorder {
                 return
             }
             
-            let isAudioReady: Bool = self.audioEnabled ? self.audioInput != nil : true
+            let isAudioReady: Bool = self.configuration.audioEnabled ? self.audioInput != nil : true
             let isVideoReady: Bool = self.videoInput != nil
             
             guard isVideoReady && isAudioReady else {
@@ -286,10 +295,6 @@ public final class MovieRecorder {
                     }
                     self.statusLock.unlock()
                 }
-            } else {
-                self.statusLock.lock()
-                self.transitionToStatus(.cancelled, error: MovieRecorderError.sessionDidNotStart)
-                self.statusLock.unlock()
             }
         }
     }
@@ -357,6 +362,7 @@ public final class MovieRecorder {
                 case .failed:
                     if let err = error {
                         self.delegate?.movieRecorder(self, didFailWithError: err)
+                        self.error = error
                     }
                 case .cancelled:
                     self.delegate?.movieRecorderDidCancelRecording(self)

@@ -69,10 +69,11 @@ public final class MovieSegmentsRecorder {
         case merging
         case deleting
     }
-    private var status: Status = .idle
-    private let statusLock = NSLock()
     
-    private let mergeQueue = DispatchQueue(label: "com.meteor.segments-recorder")
+    private var status: Status = .idle
+    private let statusLock = UnfairLock()
+    
+    private let mergeQueue = DispatchQueue(label: "org.MetalPetal.VideoIO.SegmentsRecorder")
     
     private var recorder: MovieRecorder?
     private var recordingURL: URL?
@@ -80,25 +81,15 @@ public final class MovieSegmentsRecorder {
     
     private var segments: [MovieSegment] = []
     
-    public weak var delegate: MovieSegmentsRecorderDelegate?
-    public var callbackQueue: DispatchQueue = .main
-    
-    public var metadata: [AVMetadataItem] = []
+    private weak var delegate: MovieSegmentsRecorderDelegate?
+    private let callbackQueue: DispatchQueue
 
-    /// Exif Orientation
-    public var videoOrientation: Int32 = 0
+    private let configuration: MovieRecorder.Configuration
     
-    public var videoSettings: [String: Any] = [:]
-    public var audioSettings: [String: Any] = [:]
-    
-    /// Set audio enabled `true` to record both video and audio.
-    /// Set `false' to record video only. Default is `true` `
-    public var audioEnabled: Bool = true
-    
-    public var autoCleanSegmentsAfterMerge: Bool = false
-    
-    public init() {
-        
+    public init(configuration: MovieRecorder.Configuration = MovieRecorder.Configuration(), delegate: MovieSegmentsRecorderDelegate, delegateQueue: DispatchQueue = .main) {
+        self.configuration = configuration
+        self.delegate = delegate
+        self.callbackQueue = delegateQueue
     }
     
     // for current segment
@@ -115,13 +106,7 @@ public final class MovieSegmentsRecorder {
         let recordingURL = self.generateMovieTempURL()
         self.recordingURL = recordingURL
         
-        let recorder = MovieRecorder(url: recordingURL)
-        recorder.delegate = self
-        recorder.callbackQueue = self.mergeQueue
-        recorder.videoOrientation = self.videoOrientation
-        recorder.videoSettings = self.videoSettings
-        recorder.audioSettings = self.audioSettings
-        recorder.audioEnabled = self.audioEnabled
+        let recorder = MovieRecorder(url: recordingURL, configuration: self.configuration, delegate: self, delegateQueue: self.mergeQueue)
         self.recorder = recorder
         
         // asynchronous, will call us back with recorderDidFinishPreparing: or recorder:didFailWithError: when done
@@ -230,7 +215,7 @@ public final class MovieSegmentsRecorder {
         }
     }
     
-    public func mergeAllSegments() {
+    public func mergeAllSegments(cleanAfterMerge: Bool = false) {
         statusLock.lock()
         if status != .idle {
             statusLock.unlock()
@@ -254,7 +239,7 @@ public final class MovieSegmentsRecorder {
                 }
                 self.statusLock.unlock()
                 
-                if self.autoCleanSegmentsAfterMerge {
+                if cleanAfterMerge {
                     self.deleteAllSegments()
                 }
             }
