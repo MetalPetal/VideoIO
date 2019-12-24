@@ -230,7 +230,7 @@ public class Camera: NSObject {
     public func disableAudioQueueCaptureDataOutput() {
         assert(self.audioQueueCaptureSession != nil)
         if let session = self.audioQueueCaptureSession {
-            session.disposeAudioRecording()
+            session.stopAudioRecording()
         }
         self.audioQueueCaptureSession = nil
     }

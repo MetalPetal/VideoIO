@@ -72,7 +72,7 @@ public class AudioQueueCaptureSession {
     }
     
     deinit {
-        self.disposeAudioRecording()
+        self.stopAudioRecording()
     }
     
     private static func bufferSize(format: AudioStreamBasicDescription, audioQueue: AudioQueueRef, duration: TimeInterval) throws -> Int {
@@ -102,16 +102,28 @@ public class AudioQueueCaptureSession {
         }
     }
     
+    public func beginAudioRecording() throws {
+        try self.queue.sync {
+            self._stopAudioRecording()
+            do {
+                try self._beginAudioRecording()
+            } catch {
+                self._stopAudioRecording()
+                throw error
+            }
+        }
+    }
+    
     public func beginAudioRecordingAsynchronously(completion: @escaping (Swift.Error?) -> Void) {
         self.queue.async {
             do {
-                self._disposeAudioRecording()
+                self._stopAudioRecording()
                 try self._beginAudioRecording()
                 self.delegateQueue.async {
                     completion(nil)
                 }
             } catch {
-                self._disposeAudioRecording()
+                self._stopAudioRecording()
                 self.delegateQueue.async {
                     completion(error)
                 }
@@ -212,13 +224,13 @@ public class AudioQueueCaptureSession {
         }
     }
     
-    public func disposeAudioRecording() {
+    public func stopAudioRecording() {
         self.queue.sync {
-            self._disposeAudioRecording()
+            self._stopAudioRecording()
         }
     }
     
-    private func _disposeAudioRecording() {
+    private func _stopAudioRecording() {
         if let audioQueue = self.audioQueue {
             AudioQueueStop(audioQueue, true)
             AudioQueueDispose(audioQueue, true)
