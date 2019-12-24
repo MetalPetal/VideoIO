@@ -348,7 +348,7 @@ public class AssetExportSession {
     }
 }
 
-extension AVFileType {
+extension AssetExportSession {
     public static func fileType(for url: URL) -> AVFileType? {
         switch url.pathExtension.lowercased() {
         case "mp4":
