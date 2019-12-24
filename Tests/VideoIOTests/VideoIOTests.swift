@@ -72,9 +72,27 @@ final class VideoIOTests: XCTestCase {
         XCTAssert(SampleBufferUtilities.makeSampleBufferByReplacingImageBuffer(of: sampleBufferWithNoImage!, with: newPixelBuffer!) == nil)
     }
 
+    func testPlayerVideoOutput_iOS() {
+        #if os(iOS)
+        let expectation = XCTestExpectation()
+        let player = AVPlayer(url: testMovieURL)
+        var frameCount = 0
+        let output = PlayerVideoOutput(player: player) { frame in
+            frameCount += 1
+            if frameCount >= 28 {
+                expectation.fulfill()
+            }
+        }
+        player.play()
+        XCTAssert(output.player != nil)
+        wait(for: [expectation], timeout: 10)
+        #endif
+    }
+    
     static var allTests = [
         ("testAudioVideoSettings", testAudioVideoSettings),
         ("testVideoExport", testVideoExport),
         ("testSampleBufferUtilities", testSampleBufferUtilities),
+        ("testPlayerVideoOutput_iOS", testPlayerVideoOutput_iOS),
     ]
 }
