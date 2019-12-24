@@ -15,6 +15,9 @@ public class PlayerVideoOutput: NSObject {
         public var sourcePixelBufferAttributes: [String: Any]?
         public var preferredFramesPerSecond: Int = 30
         public static let `default` = Configuration()
+        public init() {
+            
+        }
     }
     
     public struct VideoFrame {
@@ -78,7 +81,7 @@ public class PlayerVideoOutput: NSObject {
         super.init()
     }
     
-    public init(player: AVPlayer, configuration: Configuration, handler: @escaping (VideoFrame) -> Void) {
+    public init(player: AVPlayer, configuration: Configuration = .default, handler: @escaping (VideoFrame) -> Void) {
         self.configuration = configuration
         self.handler = handler
         self.player = player
