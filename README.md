@@ -68,3 +68,16 @@ player.play()
 ## MovieRecorder
 
 Record video and audio.
+
+## MovieSegmentsRecorder
+
+Record and merge video segements.
+
+## AudioQueueCaptureSession
+
+Capture audio using `AudioQueue`.
+
+## Camera
+
+Simple audio/video capture.
+
