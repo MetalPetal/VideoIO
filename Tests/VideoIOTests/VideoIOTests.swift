@@ -36,7 +36,7 @@ final class VideoIOTests: XCTestCase {
         let tempURL = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString).appendingPathExtension("mp4")
         let asset = AVURLAsset(url: testMovieURL)
         let expectation = XCTestExpectation()
-        let exporter = try! AssetExportSession(asset: asset, configuration: AssetExportSession.Configuration(fileType: .mp4, videoSettings: .h264(videoSize: asset.presentationVideoSize!), audioSettings: .aac(channels: 2, sampleRate: 44100, bitRate: 96 * 1024)), outputURL: tempURL)
+        let exporter = try! AssetExportSession(asset: asset, outputURL: tempURL, configuration: AssetExportSession.Configuration(fileType: .fileType(for: tempURL)!, videoSettings: .h264(videoSize: asset.presentationVideoSize!), audioSettings: .aac(channels: 2, sampleRate: 44100, bitRate: 96 * 1024)))
         exporter.export(progress: nil) { error in
             XCTAssert(error == nil)
             XCTAssert(try! tempURL.resourceValues(forKeys: Set<URLResourceKey>([.fileSizeKey])).fileSize! > 0)

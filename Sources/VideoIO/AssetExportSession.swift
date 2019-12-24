@@ -80,7 +80,7 @@ public class AssetExportSession {
     private let pauseDispatchGroup = DispatchGroup()
     private var cancelled: Bool = false
     
-    public init(asset: AVAsset, configuration: Configuration, outputURL: URL) throws {
+    public init(asset: AVAsset, outputURL: URL, configuration: Configuration) throws {
         self.asset = asset.copy() as! AVAsset
         self.configuration = configuration
         self.outputURL = outputURL
@@ -344,6 +344,35 @@ public class AssetExportSession {
     deinit {
         if self.status == .paused {
             self.pauseDispatchGroup.leave()
+        }
+    }
+}
+
+extension AVFileType {
+    public static func fileType(for url: URL) -> AVFileType? {
+        switch url.pathExtension.lowercased() {
+        case "mp4":
+            return .mp4
+        case "mp3":
+            return .mp3
+        case "mov":
+            return .mov
+        case "qt":
+            return .mov
+        case "m4a":
+            return .m4a
+        case "m4v":
+            return .m4v
+        case "amr":
+            return .amr
+        case "caf":
+            return .caf
+        case "wav":
+            return .wav
+        case "wave":
+            return .wav
+        default:
+            return nil
         }
     }
 }
