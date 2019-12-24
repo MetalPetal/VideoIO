@@ -8,10 +8,12 @@
 import Foundation
 import AVFoundation
 
+@available(macOS, unavailable)
 public protocol AudioQueueCaptureSessionDelegate: class {
     func audioQueueCaptureSession(_ session: AudioQueueCaptureSession, didOutputSampleBuffer sampleBuffer: CMSampleBuffer)
 }
 
+@available(macOS, unavailable)
 public class AudioQueueCaptureSession {
     
     public enum Error: Swift.Error {
@@ -59,7 +61,7 @@ public class AudioQueueCaptureSession {
             if format.mBytesPerPacket > 0 {
                 maxPacketSize = format.mBytesPerPacket
             } else {
-                var propertySize: UInt32 = MemoryLayout.size(ofValue: maxPacketSize)
+                var propertySize: UInt32 = UInt32(MemoryLayout.size(ofValue: maxPacketSize))
                 if AudioQueueGetProperty(audioQueue, kAudioQueueProperty_MaximumOutputPacketSize, &maxPacketSize, &propertySize) != 0 {
                     throw Error.cannotGetAudioQueueProperty
                 }
