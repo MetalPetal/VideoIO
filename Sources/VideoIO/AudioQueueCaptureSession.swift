@@ -30,7 +30,27 @@ public class AudioQueueCaptureSession {
         static let maximumInflightBuffers = 15
     }
     
-    private let inflightBufferSemaphore = DispatchSemaphore(value: Constants.maximumInflightBuffers)
+    private class LifetimeTracker {
+        private let callback: () -> Void
+        init(callback: @escaping () -> Void) {
+            self.callback = callback
+        }
+        deinit {
+            self.callback()
+        }
+        
+        private struct Key {
+            static var tracker = ""
+        }
+        
+        static func attach(to: AnyObject, callback: @escaping () -> Void) {
+            let tracker = LifetimeTracker(callback: callback)
+            objc_setAssociatedObject(to, &Key.tracker, tracker, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
+        }
+    }
+    
+    private let inflightBufferCountLock = UnfairLock()
+    private var inflightBufferCount = 0
     
     private let queue: DispatchQueue = DispatchQueue(label: "org.MetalPetal.VideoIO.AudioQueueCaptureSession")
     
@@ -111,9 +131,9 @@ public class AudioQueueCaptureSession {
             recordFormat.mBytesPerFrame = recordFormat.mBytesPerPacket
             recordFormat.mFramesPerPacket = 1
             
-            let info: mach_timebase_info_data_t = try {
-                var info: mach_timebase_info_data_t!
-                if mach_timebase_info(&info) != 0 {
+            let timebaseInfo: mach_timebase_info_data_t = try {
+                var info = mach_timebase_info()
+                if mach_timebase_info(&info) != KERN_SUCCESS {
                     throw Error.cannotGetTimebaseInfo
                 }
                 return info
@@ -123,7 +143,7 @@ public class AudioQueueCaptureSession {
             let status = AudioQueueNewInputWithDispatchQueue(&audioQueue, &recordFormat, 0, self.queue) { [weak self] (inAudioQueue, bufferRef, startTime, inNumPackets, inPacketDesc) in
                 guard let strongSelf = self else { return }
                 if inNumPackets > 0 {
-                    let t = Double(startTime.pointee.mHostTime) * Double(info.numer) / Double(info.denom) / Double(NSEC_PER_SEC)
+                    let t = Double(startTime.pointee.mHostTime) * Double(timebaseInfo.numer) / Double(timebaseInfo.denom) / Double(NSEC_PER_SEC)
                     let pts = CMTime(seconds: t, preferredTimescale: CMTimeScale(strongSelf.sampleRate))
                     var dataBuffer: CMBlockBuffer?
                     CMBlockBufferCreateWithMemoryBlock(allocator: nil, memoryBlock: nil, blockLength: Int(bufferRef.pointee.mAudioDataByteSize), blockAllocator: nil, customBlockSource: nil, offsetToData: 0, dataLength: Int(bufferRef.pointee.mAudioDataByteSize), flags: 0, blockBufferOut: &dataBuffer)
@@ -133,13 +153,26 @@ public class AudioQueueCaptureSession {
                         CMAudioSampleBufferCreateWithPacketDescriptions(allocator: nil, dataBuffer: dataBuffer, dataReady: true, makeDataReadyCallback: nil, refcon: nil, formatDescription: formatDesc, sampleCount: CMItemCount(inNumPackets), presentationTimeStamp: pts, packetDescriptions: inPacketDesc, sampleBufferOut: &sampleBuffer)
                         if let sampleBuffer = sampleBuffer {
                             //callback
-                            if strongSelf.inflightBufferSemaphore.wait(timeout: .now()) == .success {
+                            strongSelf.inflightBufferCountLock.lock()
+                            if strongSelf.inflightBufferCount < Constants.maximumInflightBuffers {
+                                strongSelf.inflightBufferCount += 1
+                                strongSelf.inflightBufferCountLock.unlock()
+                                
+                                LifetimeTracker.attach(to: dataBuffer) { [weak self] in
+                                    guard let strongSelf = self else {
+                                        return
+                                    }
+                                    strongSelf.inflightBufferCountLock.lock()
+                                    defer { strongSelf.inflightBufferCountLock.unlock() }
+                                    strongSelf.inflightBufferCount -= 1
+                                }
+                                
                                 strongSelf.delegateQueue.async {
                                     strongSelf.delegate?.audioQueueCaptureSession(strongSelf, didOutputSampleBuffer: sampleBuffer)
-                                    strongSelf.inflightBufferSemaphore.signal()
                                 }
                             } else {
-                                //buffer dropped
+                                strongSelf.inflightBufferCountLock.unlock()
+                                print("\(strongSelf): Buffer dropped due to too many inflight buffer.")
                             }
                         }
                     }

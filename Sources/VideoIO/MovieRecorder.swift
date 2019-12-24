@@ -235,8 +235,15 @@ public final class MovieRecorder {
                             }
                         }
                     } else if mediaType == kCMMediaType_Audio {
-                        self.tryToAppendLastAudioSampleBuffers()
-                        self.tryToAppendAudioSampleBuffer(sampleBuffer)
+                        do {
+                            try self.tryToAppendLastAudioSampleBuffers()
+                            try self.tryToAppendAudioSampleBuffer(sampleBuffer)
+                        } catch {
+                            self.statusLock.lock()
+                            self.transitionToStatus(.failed, error: error)
+                            self.statusLock.unlock()
+                            return
+                        }
                     }
                 } else {
                     print("\(mediaType) input not ready for more media data, dropping buffer")
@@ -283,7 +290,14 @@ public final class MovieRecorder {
             self.transitionToStatus(.finishingRecordingPart2, error: nil)
             self.statusLock.unlock()
             
-            self.tryToAppendLastAudioSampleBuffers()
+            do {
+                try self.tryToAppendLastAudioSampleBuffers()
+            } catch {
+                self.statusLock.lock()
+                self.transitionToStatus(.failed, error: error)
+                self.statusLock.unlock()
+                return
+            }
             
             if let assetWriter = self.assetWriter, assetWriter.status == .writing {
                 assetWriter.finishWriting {
@@ -458,19 +472,18 @@ public final class MovieRecorder {
     // MARK: - Audio sample buffer queue operations
     // call in _writingQueue
     
-    private func tryToAppendLastAudioSampleBuffers() {
+    private func tryToAppendLastAudioSampleBuffers() throws {
         guard self.audioSampleBufferQueue.count > 0 else {
             return
         }
-        let array = self.audioSampleBufferQueue
-        for i in 0 ..< array.count {
-            let audioSampleBuffer = array[i]
-            self.audioSampleBufferQueue.remove(at: i)
-            self.tryToAppendAudioSampleBuffer(audioSampleBuffer)
+        let bufferQueue = self.audioSampleBufferQueue
+        for sampleBuffer in bufferQueue {
+            self.audioSampleBufferQueue.remove(at: 0)
+            try self.tryToAppendAudioSampleBuffer(sampleBuffer)
         }
     }
     
-    private func tryToAppendAudioSampleBuffer(_ audioSampleBuffer: CMSampleBuffer) {
+    private func tryToAppendAudioSampleBuffer(_ audioSampleBuffer: CMSampleBuffer) throws {
         let duration = CMSampleBufferGetDuration(audioSampleBuffer)
         let presentationTime = CMTimeAdd(CMSampleBufferGetPresentationTimeStamp(audioSampleBuffer), duration)
         if CMTimeCompare(presentationTime, self.lastVideoSampleTime) > 0 {
@@ -479,10 +492,9 @@ public final class MovieRecorder {
             if audioInput.isReadyForMoreMediaData {
                 let success = audioInput.append(audioSampleBuffer)
                 if !success {
-                    let error = self.assetWriter?.error
-                    statusLock.lock()
-                    self.transitionToStatus(.failed, error: error)
-                    statusLock.unlock()
+                    if let error = self.assetWriter?.error {
+                        throw error
+                    }
                 }
             }
         }
