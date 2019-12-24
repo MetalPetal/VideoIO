@@ -12,15 +12,15 @@ import CoreImage
 public protocol MovieRecorderDelegate: class {
     
     func movieRecorderDidFinishPreparing(_ recorder: MovieRecorder)
-
+    
     func movieRecorderDidCancelRecording(_ recorder: MovieRecorder)
-
+    
     func movieRecorder(_ recorder: MovieRecorder, didFailWithError error: Error)
-
+    
     func movieRecorderDidFinishRecording(_ recorder: MovieRecorder)
     
     func movieRecorder(_ recorder: MovieRecorder, didUpdateWithTotalDuration totalDuration: TimeInterval)
-
+    
 }
 
 public enum MovieRecorderError: LocalizedError {
@@ -57,14 +57,13 @@ public final class MovieRecorder {
     private let writingQueue = DispatchQueue(label: "org.MetalPetal.VideoIO.MovieRecorder", autoreleaseFrequency: .workItem)
     
     public let url: URL
-
+    
     private var assetWriter: AVAssetWriter?
-    private var haveStartedSession = false
     
     private var videoInput: AVAssetWriterInput?
     private var audioInput: AVAssetWriterInput?
     
-    private var videoSampleTime: CMTime = .invalid
+    private var recordStartSampleTime: CMTime = .invalid
     private var lastVideoSampleTime: CMTime = .invalid
     
     private var audioSampleBufferQueue: [CMSampleBuffer] = []
@@ -73,26 +72,28 @@ public final class MovieRecorder {
     public var callbackQueue: DispatchQueue = .main
     
     public var metadata: [AVMetadataItem] = []
-
+    
     /// Exif Orientation
     public var videoOrientation: Int32 = 0
     
+    
+    // You can use VideoSettings/VideoSettings API to create these dictionary.
     public var videoSettings: [String: Any] = [:]
+    
+    // Audio sample rate and channel layout will be override by the recorder.
     public var audioSettings: [String: Any] = [:]
-
-    public var duration: CMTime {
-        return videoSampleTime
-    }
+    
+    public private(set) var duration: CMTime = .zero
     
     /// Set audio enabled `true` to record both video and audio.
     /// Set `false' to record video only. Default is `true` `
     public var audioEnabled: Bool = true
-
+    
     /// Init with target URL
     public init(url: URL) {
         self.url = url
     }
-
+    
     /// Asynchronous, might take several hundred milliseconds.
     /// When finished the delegate's recorderDidFinishPreparing: or recorder:didFailWithError: method will be called.
     public func prepareToRecord() {
@@ -103,7 +104,7 @@ public final class MovieRecorder {
             return
         }
         transitionToStatus(.preparingToRecord, error: nil)
-
+        
         writingQueue.async {
             // AVAssetWriter will not write over an existing file.
             try? FileManager.default.removeItem(at: self.url)
@@ -121,7 +122,7 @@ public final class MovieRecorder {
             }
         }
     }
-
+    
     public func append(sampleBuffer: CMSampleBuffer) {
         guard let formatDescription = CMSampleBufferGetFormatDescription(sampleBuffer) else {
             return
@@ -165,7 +166,7 @@ public final class MovieRecorder {
                     }
                 }
             } else {
-                // ignore other meida types
+                assertionFailure("Cannot handle sample buffer: \(sampleBuffer)")
                 return
             }
             
@@ -173,59 +174,68 @@ public final class MovieRecorder {
                 self.statusLock.lock()
                 self.transitionToStatus(.failed, error: e)
                 self.statusLock.unlock()
+                
+                return
             }
             
             let isAudioReady: Bool = self.audioEnabled ? self.audioInput != nil : true
+            let isVideoReady: Bool = self.videoInput != nil
             
-            if err == nil && self.videoInput != nil && isAudioReady {
-                if self.haveStartedSession == false && mediaType == kCMMediaType_Video {
-                    if let assetWriter = self.assetWriter {
-                        let success = assetWriter.startWriting()
-                        if !success {
-                            err = assetWriter.error
-                        }
-                        
-                        if let e = err {
+            guard isVideoReady && isAudioReady else {
+                return
+            }
+            
+            if mediaType == kCMMediaType_Video {
+                if let assetWriter = self.assetWriter, assetWriter.status == .unknown {
+                    if !assetWriter.startWriting() {
+                        if let error = assetWriter.error {
                             self.statusLock.lock()
-                            self.transitionToStatus(.failed, error: e)
+                            self.transitionToStatus(.failed, error: error)
                             self.statusLock.unlock()
+                            return
                         }
-                        
-                        let presentationTime = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
-                        assetWriter.startSession(atSourceTime: presentationTime)
-                        
-                        self.videoSampleTime = .zero
-                        self.lastVideoSampleTime = presentationTime
-                        self.haveStartedSession = true
                     }
+                    
+                    let presentationTime = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
+                    assetWriter.startSession(atSourceTime: presentationTime)
+                    
+                    self.recordStartSampleTime = presentationTime
+                    self.lastVideoSampleTime = presentationTime
                 }
             }
             
             let mediaInput = mediaType == kCMMediaType_Video ? self.videoInput : self.audioInput
             
-            if let input = mediaInput, input.isReadyForMoreMediaData, self.haveStartedSession {
-                if mediaType == kCMMediaType_Video {
-                    let success = input.append(sampleBuffer)
-                    if success {
-                        let presentationTime = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
-                        self.videoSampleTime = CMTimeAdd(self.videoSampleTime, CMTimeSubtract(presentationTime, self.lastVideoSampleTime))
-                        let duration = self.videoSampleTime.seconds
-                        self.callbackQueue.async {
-                            self.delegate?.movieRecorder(self, didUpdateWithTotalDuration: duration)
+            if let assetWriter = self.assetWriter, assetWriter.status == .writing {
+                if let input = mediaInput, input.isReadyForMoreMediaData {
+                    if mediaType == kCMMediaType_Video {
+                        if input.append(sampleBuffer) {
+                            let startTime = self.recordStartSampleTime
+                            let presentationTime = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
+                            self.lastVideoSampleTime = presentationTime
+                            self.callbackQueue.async {
+                                self.duration = presentationTime - startTime
+                                self.delegate?.movieRecorder(self, didUpdateWithTotalDuration: self.duration.seconds)
+                            }
+                        } else {
+                            if let error = assetWriter.error {
+                                self.statusLock.lock()
+                                self.transitionToStatus(.failed, error: error)
+                                self.statusLock.unlock()
+                                return
+                            }
                         }
-                        self.lastVideoSampleTime = presentationTime
+                    } else if mediaType == kCMMediaType_Audio {
+                        self.tryToAppendLastAudioSampleBuffers()
+                        self.tryToAppendAudioSampleBuffer(sampleBuffer)
                     }
-                    
-                } else if mediaType == kCMMediaType_Audio {
-                    self.tryToAppendLastAudioSampleBuffers()
-                    self.tryToAppendAudioSampleBuffer(sampleBuffer)
+                } else {
+                    print("\(mediaType) input not ready for more media data, dropping buffer")
                 }
-            } else {
-                print("\(mediaType) input not ready for more media data, dropping buffer")
             }
         }
     }
-
+    
     /// Asynchronous, might take several hundred milliseconds.
     /// When finished the delegate's recorderDidFinishRecording: or recorder:didFailWithError: method will be called.
     public func finishRecording() {
@@ -283,7 +293,7 @@ public final class MovieRecorder {
             }
         }
     }
-
+    
     /// Asynchronous, might take several hundred milliseconds.
     /// When finished the delegate's movieRecorderDidCancelRecording: method will be called.
     public func cancelRecording() {
@@ -336,7 +346,7 @@ public final class MovieRecorder {
             
             self.status = newStatus
         }
-
+        
         if shouldNotifyDelegate {
             callbackQueue.async {
                 switch newStatus {
@@ -363,8 +373,9 @@ public final class MovieRecorder {
         audioInput = nil
         assetWriter = nil
         audioSampleBufferQueue.removeAll()
+        recordStartSampleTime = .invalid
         lastVideoSampleTime = .invalid
-        haveStartedSession = false
+        duration = .zero
     }
     
     // MARK: - Setup Asset Writer Inputs
@@ -435,7 +446,7 @@ public final class MovieRecorder {
         } else {
             throw MovieRecorderError.cannotSetupInput
         }
-
+        
     }
     
     // MARK: - Audio sample buffer queue operations
