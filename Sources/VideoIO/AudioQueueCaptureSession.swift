@@ -27,7 +27,10 @@ public class AudioQueueCaptureSession {
     
     private struct Constants {
         static let numberOfBuffersInQueue = 30
+        static let maximumInflightBuffers = 15
     }
+    
+    private let inflightBufferSemaphore = DispatchSemaphore(value: Constants.maximumInflightBuffers)
     
     private let queue: DispatchQueue = DispatchQueue(label: "org.MetalPetal.VideoIO.AudioQueueCaptureSession")
     
@@ -130,8 +133,13 @@ public class AudioQueueCaptureSession {
                         CMAudioSampleBufferCreateWithPacketDescriptions(allocator: nil, dataBuffer: dataBuffer, dataReady: true, makeDataReadyCallback: nil, refcon: nil, formatDescription: formatDesc, sampleCount: CMItemCount(inNumPackets), presentationTimeStamp: pts, packetDescriptions: inPacketDesc, sampleBufferOut: &sampleBuffer)
                         if let sampleBuffer = sampleBuffer {
                             //callback
-                            strongSelf.delegateQueue.async {
-                                strongSelf.delegate?.audioQueueCaptureSession(strongSelf, didOutputSampleBuffer: sampleBuffer)
+                            if strongSelf.inflightBufferSemaphore.wait(timeout: .now()) == .success {
+                                strongSelf.delegateQueue.async {
+                                    strongSelf.delegate?.audioQueueCaptureSession(strongSelf, didOutputSampleBuffer: sampleBuffer)
+                                    strongSelf.inflightBufferSemaphore.signal()
+                                }
+                            } else {
+                                //buffer dropped
                             }
                         }
                     }

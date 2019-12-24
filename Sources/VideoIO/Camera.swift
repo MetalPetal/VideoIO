@@ -216,6 +216,25 @@ public class Camera: NSObject {
     
     #if os(iOS)
     
+    private var audioQueueCaptureSession: AudioQueueCaptureSession?
+    
+    public func enableAudioQueueCaptureDataOutput(on queue: DispatchQueue = .main, delegate: AudioQueueCaptureSessionDelegate, completion: ((Swift.Error?) -> Void)? = nil) {
+        assert(self.audioDataOutput == nil)
+        assert(self.audioQueueCaptureSession == nil)
+        self.audioQueueCaptureSession = AudioQueueCaptureSession(delegate: delegate, delegateQueue: queue)
+        self.audioQueueCaptureSession?.beginAudioRecordingAsynchronously(completion: { error in
+            completion?(error)
+        })
+    }
+    
+    public func disableAudioQueueCaptureDataOutput() {
+        assert(self.audioQueueCaptureSession != nil)
+        if let session = self.audioQueueCaptureSession {
+            session.disposeAudioRecording()
+        }
+        self.audioQueueCaptureSession = nil
+    }
+    
     private class MetadataOutputDelegateHandler: NSObject, AVCaptureMetadataOutputObjectsDelegate {
         private let callback: ([AVMetadataObject]) -> Void
         public init(callback: @escaping ([AVMetadataObject]) -> Void) {
