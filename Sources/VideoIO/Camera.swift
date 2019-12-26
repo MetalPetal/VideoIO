@@ -17,12 +17,23 @@ public class Camera: NSObject {
         case cannotAddOutput
     }
     
-    public let captureSession: AVCaptureSession = AVCaptureSession()
+    public let captureSession: AVCaptureSession
+    
+    public let photoOutput: AVCapturePhotoOutput?
         
     public init(captureSessionPreset: AVCaptureSession.Preset, defaultCameraPosition: AVCaptureDevice.Position = .back) {
+        let captureSession = AVCaptureSession()
+        assert(captureSession.canSetSessionPreset(captureSessionPreset))
+        captureSession.sessionPreset = captureSessionPreset
+        let photoOutput = AVCapturePhotoOutput()
+        if captureSession.canAddOutput(photoOutput) {
+            captureSession.addOutput(photoOutput)
+            self.photoOutput = photoOutput
+        } else {
+            self.photoOutput = nil
+        }
+        self.captureSession = captureSession
         super.init()
-        assert(self.captureSession.canSetSessionPreset(captureSessionPreset))
-        self.captureSession.sessionPreset = captureSessionPreset
         try? self.switchToVideoCaptureDevice(with: defaultCameraPosition)
     }
     
@@ -60,7 +71,7 @@ public class Camera: NSObject {
             deviceTypes = [.builtInWideAngleCamera]
             #else
             if #available(iOS 11.1, *) {
-                deviceTypes = [.builtInDualCamera, .builtInWideAngleCamera, .builtInTrueDepthCamera]
+                deviceTypes = [.builtInDualCamera, .builtInTrueDepthCamera, .builtInWideAngleCamera]
             } else if #available(iOS 10.2, *) {
                 deviceTypes = [.builtInDualCamera, .builtInWideAngleCamera]
             } else {
@@ -147,14 +158,14 @@ public class Camera: NSObject {
         let videoDataOutput = AVCaptureVideoDataOutput()
         videoDataOutput.alwaysDiscardsLateVideoFrames = true
         videoDataOutput.setSampleBufferDelegate(delegate, queue: queue)
-        self.videoDataOutput = videoDataOutput
         if self.captureSession.canAddOutput(videoDataOutput) {
             self.captureSession.addOutput(videoDataOutput)
+            self.videoDataOutput = videoDataOutput
         } else {
             throw Error.cannotAddOutput
         }
-        self.updateVideoConnection()
         self.captureSession.commitConfiguration()
+        self.updateVideoConnection()
     }
     
     public func disableVideoDataOutput() {
@@ -193,10 +204,10 @@ public class Camera: NSObject {
         audioDataOutput.setSampleBufferDelegate(delegate, queue: queue)
         if self.captureSession.canAddOutput(audioDataOutput) {
             self.captureSession.addOutput(audioDataOutput)
+            self.audioDataOutput = audioDataOutput
         } else {
             throw Error.cannotAddOutput
         }
-        self.audioDataOutput = audioDataOutput
         self.captureSession.commitConfiguration()
     }
     
@@ -216,35 +227,7 @@ public class Camera: NSObject {
     
     #if os(iOS)
     
-    private var audioQueueCaptureSession: AudioQueueCaptureSession?
-    
-    public func enableAudioQueueCaptureDataOutput(on queue: DispatchQueue = .main, delegate: AudioQueueCaptureSessionDelegate, completion: ((Swift.Error?) -> Void)? = nil) {
-        assert(self.audioDataOutput == nil)
-        assert(self.audioQueueCaptureSession == nil)
-        self.audioQueueCaptureSession = AudioQueueCaptureSession(delegate: delegate, delegateQueue: queue)
-        self.audioQueueCaptureSession?.beginAudioRecordingAsynchronously(completion: { error in
-            completion?(error)
-        })
-    }
-    
-    public func disableAudioQueueCaptureDataOutput() {
-        assert(self.audioQueueCaptureSession != nil)
-        if let session = self.audioQueueCaptureSession {
-            session.stopAudioRecording()
-        }
-        self.audioQueueCaptureSession = nil
-    }
-    
-    private class MetadataOutputDelegateHandler: NSObject, AVCaptureMetadataOutputObjectsDelegate {
-        private let callback: ([AVMetadataObject]) -> Void
-        public init(callback: @escaping ([AVMetadataObject]) -> Void) {
-            self.callback = callback
-        }
-        public func metadataOutput(_ output: AVCaptureMetadataOutput, didOutput metadataObjects: [AVMetadataObject], from connection: AVCaptureConnection) {
-            self.callback(metadataObjects)
-        }
-    }
-    
+   
     public var metadataCaptureConnection: AVCaptureConnection? {
         return self.metadataOutput?.connection(with: .metadata)
     }
@@ -261,11 +244,11 @@ public class Camera: NSObject {
         output.setMetadataObjectsDelegate(delegate, queue: queue)
         if self.captureSession.canAddOutput(output) {
             self.captureSession.addOutput(output)
+            self.metadataOutput = output
         } else {
             throw Error.cannotAddOutput
         }
         output.metadataObjectTypes = metadataObjectTypes
-        self.metadataOutput = output
         self.captureSession.commitConfiguration()
     }
     
@@ -278,5 +261,98 @@ public class Camera: NSObject {
         self.captureSession.commitConfiguration()
     }
     
+    public var isDepthDataOutputSupported: Bool {
+        if #available(iOS 11.0, *) {
+            return self.photoOutput?.isDepthDataDeliverySupported ?? false
+        } else {
+            return false
+        }
+    }
+    
+    private var _outputSynchronizer: Any?
+    @available(iOS 11.0, *)
+    private var outputSynchronizer: AVCaptureDataOutputSynchronizer? {
+        get {
+            return _outputSynchronizer as? AVCaptureDataOutputSynchronizer
+        }
+        set {
+            _outputSynchronizer = newValue
+        }
+    }
+    
+    private var _depthDataOutput: Any?
+    @available(iOS 11.0, *)
+    public private(set) var depthDataOutput: AVCaptureDepthDataOutput? {
+        get {
+            return _depthDataOutput as? AVCaptureDepthDataOutput
+        }
+        set {
+            _depthDataOutput = newValue
+        }
+    }
+    
+    @available(iOS 11.0, *)
+    public func enableSynchronizedVideoAndDepthDataOutput(on queue: DispatchQueue, delegate: AVCaptureDataOutputSynchronizerDelegate) throws {
+        assert(self.videoDataOutput == nil)
+        assert(self.outputSynchronizer == nil)
+        
+        self.captureSession.beginConfiguration()
+        
+        if let output = self.videoDataOutput {
+            self.captureSession.removeOutput(output)
+        }
+        let videoDataOutput = AVCaptureVideoDataOutput()
+        videoDataOutput.alwaysDiscardsLateVideoFrames = true
+        if self.captureSession.canAddOutput(videoDataOutput) {
+            self.captureSession.addOutput(videoDataOutput)
+            self.videoDataOutput = videoDataOutput
+        } else {
+            throw Error.cannotAddOutput
+        }
+        
+        let depthDataOutput = AVCaptureDepthDataOutput()
+        depthDataOutput.alwaysDiscardsLateDepthData = true
+        if self.captureSession.canAddOutput(depthDataOutput) {
+            self.captureSession.addOutput(depthDataOutput)
+            self.depthDataOutput = depthDataOutput
+        } else {
+            throw Error.cannotAddOutput
+        }
+        
+        let outputSynchronizer = AVCaptureDataOutputSynchronizer(dataOutputs: [videoDataOutput, depthDataOutput])
+        outputSynchronizer.setDelegate(delegate, queue: queue)
+        self.outputSynchronizer = outputSynchronizer
+        
+        self.captureSession.commitConfiguration()
+        self.updateVideoConnection()
+    }
+    
+    @available(iOS 11.0, *)
+    public func disableSynchronizedVideoAndDepthDataOutput() {
+        self.captureSession.beginConfiguration()
+        
+        self.outputSynchronizer = nil
+        
+        if let output = self.videoDataOutput {
+            self.captureSession.removeOutput(output)
+        }
+        self.videoDataOutput = nil
+        
+        if let depthOutput = self.depthDataOutput {
+            self.captureSession.removeOutput(depthOutput)
+        }
+        self.depthDataOutput = nil
+        
+        self.captureSession.commitConfiguration()
+    }
+    
     #endif
+    
+    // MARK: - Extension
+    
+    internal var photoCaptureDelegateHandlers: [AnyObject] = []
+    
+    @available(macOS, unavailable)
+    internal var audioQueueCaptureSession: AudioQueueCaptureSession?
 }
+
