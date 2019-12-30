@@ -136,15 +136,29 @@ public class Camera: NSObject {
     
     private func updateVideoConnection() {
         if let videoConnection = self.videoCaptureConnection {
-            videoConnection.videoOrientation = .portrait
-            if self.videoDevice?.position == .front {
-                videoConnection.isVideoMirrored = true
+            if videoConnection.isVideoOrientationSupported && videoConnection.isVideoMirroringSupported {
+                videoConnection.videoOrientation = .portrait
+                if self.videoDevice?.position == .front {
+                    videoConnection.isVideoMirrored = true
+                }
+            }
+        }
+        if let depthConnection = self.depthCaptureConnection {
+            if depthConnection.isVideoOrientationSupported && depthConnection.isVideoMirroringSupported {
+                depthConnection.videoOrientation = .portrait
+                if self.videoDevice?.position == .front {
+                    depthConnection.isVideoMirrored = true
+                }
             }
         }
     }
     
     public var videoCaptureConnection: AVCaptureConnection? {
         return self.videoDataOutput?.connection(with: .video)
+    }
+    
+    public var depthCaptureConnection: AVCaptureConnection? {
+        return self.depthDataOutput?.connection(with: .depthData)
     }
     
     public private(set) var videoDataOutput: AVCaptureVideoDataOutput?
