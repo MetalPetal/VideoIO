@@ -161,6 +161,10 @@ public class Camera: NSObject {
         return self.depthDataOutput?.connection(with: .depthData)
     }
     
+    public var audioCaptureConnection: AVCaptureConnection? {
+        return self.audioDataOutput?.connection(with: .audio)
+    }
+    
     public private(set) var videoDataOutput: AVCaptureVideoDataOutput?
         
     public func enableVideoDataOutput(on queue: DispatchQueue = .main, delegate: AVCaptureVideoDataOutputSampleBufferDelegate) throws {
