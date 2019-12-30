@@ -31,14 +31,16 @@ public class DeviceOrientationTracker {
     
     public weak var delegate: DeviceOrientationTrackerDelegate?
     
-    public init() {
+    public init(updateInterval: TimeInterval = 0.33, delegate: DeviceOrientationTrackerDelegate? = nil) {
         queue = OperationQueue()
         queue.maxConcurrentOperationCount = 1
         
-        motionManager.accelerometerUpdateInterval = 0.33
-        motionManager.deviceMotionUpdateInterval = 0.33
-        motionManager.gyroUpdateInterval = 0.33
-        motionManager.magnetometerUpdateInterval = 0.33
+        motionManager.accelerometerUpdateInterval = updateInterval
+        motionManager.deviceMotionUpdateInterval = updateInterval
+        motionManager.gyroUpdateInterval = updateInterval
+        motionManager.magnetometerUpdateInterval = updateInterval
+        
+        self.delegate = delegate
     }
     
     private func handle(motionData: CMDeviceMotion) {
@@ -128,12 +130,6 @@ public class DeviceOrientationTracker {
         }
         motionManager.startDeviceMotionUpdates(to: queue) { [weak self] (motionData, error) in
             guard let strongSelf = self, let motionData = motionData else {
-                return
-            }
-            strongSelf.handle(motionData: motionData)
-        }
-        queue.addOperation { [weak self] in
-            guard let strongSelf = self, let motionData = strongSelf.motionManager.deviceMotion else {
                 return
             }
             strongSelf.handle(motionData: motionData)
