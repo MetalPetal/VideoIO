@@ -143,14 +143,18 @@ public class Camera: NSObject {
                 }
             }
         }
-        if let depthConnection = self.depthCaptureConnection {
-            if depthConnection.isVideoOrientationSupported && depthConnection.isVideoMirroringSupported {
-                depthConnection.videoOrientation = .portrait
-                if self.videoDevice?.position == .front {
-                    depthConnection.isVideoMirrored = true
+        #if os(iOS)
+        if #available(iOS 11.0, *) {
+            if let depthConnection = self.depthCaptureConnection {
+                if depthConnection.isVideoOrientationSupported && depthConnection.isVideoMirroringSupported {
+                    depthConnection.videoOrientation = .portrait
+                    if self.videoDevice?.position == .front {
+                        depthConnection.isVideoMirrored = true
+                    }
                 }
             }
         }
+        #endif
     }
     
     public var videoCaptureConnection: AVCaptureConnection? {
