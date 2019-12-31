@@ -104,6 +104,12 @@ public class DeviceOrientationTracker {
                         deviceOrientation = .landscapeRight
                     }
                 default:
+                    if angle < 0 && angle > -2.05 {
+                        deviceOrientation = .portrait
+                    }
+                    if angle > 0 && angle < 2.05 {
+                        deviceOrientation = .portraitUpsideDown
+                    }
                     if angle > -0.47 {
                         deviceOrientation = .landscapeLeft
                     }
