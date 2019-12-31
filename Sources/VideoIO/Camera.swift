@@ -17,11 +17,37 @@ public class Camera: NSObject {
         case cannotAddOutput
     }
     
+    public struct Configurator {
+        /// Called when video connection estiblished or video device changed. Called before `captureSession.commitConfiguration`.
+        public var videoConnectionConfigurator: (Camera, AVCaptureConnection) -> Void
+        
+        /// Called when a new video device is selected. Called in `device.lockForConfiguration`/`unlockForConfiguration` block.
+        public var videoDeviceConfigurator: (Camera, AVCaptureDevice) -> Void
+       
+        public static let portraitFrontMirroredVideoOutput: Configurator = {
+            var configurator = Configurator()
+            configurator.videoConnectionConfigurator = { camera, connection in
+                connection.videoOrientation = .portrait
+                if camera.videoDevice?.position == .front {
+                    connection.isVideoMirrored = true
+                }
+            }
+            return configurator
+        }()
+        
+        public init() {
+            self.videoDeviceConfigurator = { _,_ in }
+            self.videoConnectionConfigurator = { _,_ in }
+        }
+    }
+    
     public let captureSession: AVCaptureSession
     
     public let photoOutput: AVCapturePhotoOutput?
         
-    public init(captureSessionPreset: AVCaptureSession.Preset, defaultCameraPosition: AVCaptureDevice.Position = .back) {
+    private let configurator: Configurator
+    
+    public init(captureSessionPreset: AVCaptureSession.Preset, defaultCameraPosition: AVCaptureDevice.Position = .back, configurator: Configurator = Configurator()) {
         let captureSession = AVCaptureSession()
         assert(captureSession.canSetSessionPreset(captureSessionPreset))
         captureSession.sessionPreset = captureSessionPreset
@@ -33,6 +59,7 @@ public class Camera: NSObject {
             self.photoOutput = nil
         }
         self.captureSession = captureSession
+        self.configurator = configurator
         super.init()
         try? self.switchToVideoCaptureDevice(with: defaultCameraPosition)
     }
@@ -41,7 +68,8 @@ public class Camera: NSObject {
         return self.captureSession.isRunning
     }
     
-    public func startRunningCaptureSession() {
+    /// Start the capture session. Completion handler is called when the session is started, called on main queue.
+    public func startRunningCaptureSession(completion: (() -> Void)? = nil) {
         if !self.captureSession.isRunning {
             self.captureSession.startRunning()
         }
@@ -84,36 +112,7 @@ public class Camera: NSObject {
         let discoverySession = AVCaptureDevice.DiscoverySession(deviceTypes: deviceTypes, mediaType: .video, position: position)
         if let device = discoverySession.devices.first {
             try device.lockForConfiguration()
-            
-            #if os(iOS)
-            if device.isSmoothAutoFocusSupported {
-                device.isSmoothAutoFocusEnabled = true
-            }
-            #endif
-            
-            if device.isFocusModeSupported(.continuousAutoFocus) {
-                device.focusMode = .continuousAutoFocus
-            } else if device.isFocusModeSupported(.autoFocus) {
-                device.focusMode = .autoFocus
-            }
-            
-            if device.isExposureModeSupported(.continuousAutoExposure) {
-                device.exposureMode = .continuousAutoExposure
-            } else if device.isExposureModeSupported(.autoExpose) {
-                device.exposureMode = .autoExpose
-            }
-            
-            if device.isWhiteBalanceModeSupported(.continuousAutoWhiteBalance) {
-                device.whiteBalanceMode = .continuousAutoWhiteBalance
-            }
-            
-            #if os(iOS)
-            if device.isLowLightBoostSupported {
-                device.automaticallyEnablesLowLightBoostWhenAvailable = true
-            }
-            device.automaticallyAdjustsVideoHDREnabled = true
-            #endif
-            
+            self.configurator.videoDeviceConfigurator(self, device)
             device.unlockForConfiguration()
             
             let newVideoDeviceInput = try AVCaptureDeviceInput(device: device)
@@ -127,34 +126,14 @@ public class Camera: NSObject {
             } else {
                 throw Error.cannotAddInput
             }
+            
+            if let connection = self.videoCaptureConnection {
+                self.configurator.videoConnectionConfigurator(self, connection)
+            }
             self.captureSession.commitConfiguration()
-            self.updateVideoConnection()
         } else {
             throw Error.noDeviceFound
         }
-    }
-    
-    private func updateVideoConnection() {
-        if let videoConnection = self.videoCaptureConnection {
-            if videoConnection.isVideoOrientationSupported && videoConnection.isVideoMirroringSupported {
-                videoConnection.videoOrientation = .portrait
-                if self.videoDevice?.position == .front {
-                    videoConnection.isVideoMirrored = true
-                }
-            }
-        }
-        #if os(iOS)
-        if #available(iOS 11.0, *) {
-            if let depthConnection = self.depthCaptureConnection {
-                if depthConnection.isVideoOrientationSupported && depthConnection.isVideoMirroringSupported {
-                    depthConnection.videoOrientation = .portrait
-                    if self.videoDevice?.position == .front {
-                        depthConnection.isVideoMirrored = true
-                    }
-                }
-            }
-        }
-        #endif
     }
     
     public var videoCaptureConnection: AVCaptureConnection? {
@@ -178,8 +157,11 @@ public class Camera: NSObject {
         } else {
             throw Error.cannotAddOutput
         }
+        
+        if let connection = self.videoCaptureConnection {
+            self.configurator.videoConnectionConfigurator(self, connection)
+        }
         self.captureSession.commitConfiguration()
-        self.updateVideoConnection()
     }
     
     public func disableVideoDataOutput() {
@@ -342,8 +324,10 @@ public class Camera: NSObject {
         outputSynchronizer.setDelegate(delegate, queue: queue)
         self.outputSynchronizer = outputSynchronizer
         
+        if let connection = self.videoCaptureConnection {
+            self.configurator.videoConnectionConfigurator(self, connection)
+        }
         self.captureSession.commitConfiguration()
-        self.updateVideoConnection()
     }
     
     @available(iOS 11.0, *)
