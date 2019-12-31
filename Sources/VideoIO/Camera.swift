@@ -47,9 +47,12 @@ public class Camera: NSObject {
         
     private let configurator: Configurator
     
+    private let defaultCameraPosition: AVCaptureDevice.Position
+    
     public init(captureSessionPreset: AVCaptureSession.Preset, defaultCameraPosition: AVCaptureDevice.Position = .back, configurator: Configurator = Configurator()) {
         let captureSession = AVCaptureSession()
         assert(captureSession.canSetSessionPreset(captureSessionPreset))
+        captureSession.beginConfiguration()
         captureSession.sessionPreset = captureSessionPreset
         let photoOutput = AVCapturePhotoOutput()
         if captureSession.canAddOutput(photoOutput) {
@@ -58,10 +61,11 @@ public class Camera: NSObject {
         } else {
             self.photoOutput = nil
         }
+        captureSession.commitConfiguration()
         self.captureSession = captureSession
         self.configurator = configurator
+        self.defaultCameraPosition = defaultCameraPosition
         super.init()
-        try? self.switchToVideoCaptureDevice(with: defaultCameraPosition)
     }
     
     public var captureSessionIsRunning: Bool {
@@ -117,6 +121,9 @@ public class Camera: NSObject {
             
             let newVideoDeviceInput = try AVCaptureDeviceInput(device: device)
             self.captureSession.beginConfiguration()
+            defer {
+                self.captureSession.commitConfiguration()
+            }
             if let currentVideoDeviceInput = self.videoDeviceInput {
                 self.captureSession.removeInput(currentVideoDeviceInput)
             }
@@ -130,7 +137,6 @@ public class Camera: NSObject {
             if let connection = self.videoCaptureConnection {
                 self.configurator.videoConnectionConfigurator(self, connection)
             }
-            self.captureSession.commitConfiguration()
         } else {
             throw Error.noDeviceFound
         }
@@ -144,7 +150,13 @@ public class Camera: NSObject {
         
     public func enableVideoDataOutput(on queue: DispatchQueue = .main, delegate: AVCaptureVideoDataOutputSampleBufferDelegate) throws {
         assert(self.videoDataOutput == nil)
+        if self.videoDevice == nil {
+            try self.switchToVideoCaptureDevice(with: self.defaultCameraPosition)
+        }
         self.captureSession.beginConfiguration()
+        defer {
+            self.captureSession.commitConfiguration()
+        }
         if let output = self.videoDataOutput {
             self.captureSession.removeOutput(output)
         }
@@ -161,7 +173,6 @@ public class Camera: NSObject {
         if let connection = self.videoCaptureConnection {
             self.configurator.videoConnectionConfigurator(self, connection)
         }
-        self.captureSession.commitConfiguration()
     }
     
     public func disableVideoDataOutput() {
@@ -181,6 +192,9 @@ public class Camera: NSObject {
 
     public func enableAudioDataOutput(on queue: DispatchQueue = .main, delegate: AVCaptureAudioDataOutputSampleBufferDelegate) throws {
         self.captureSession.beginConfiguration()
+        defer {
+            self.captureSession.commitConfiguration()
+        }
         if self.audioDeviceInput == nil {
             if let device = AVCaptureDevice.default(for: .audio), let audioDeviceInput = try? AVCaptureDeviceInput(device: device) {
                 if self.captureSession.canAddInput(audioDeviceInput) {
@@ -204,7 +218,6 @@ public class Camera: NSObject {
         } else {
             throw Error.cannotAddOutput
         }
-        self.captureSession.commitConfiguration()
     }
     
     public func disableAudioDataOutput() {
@@ -233,6 +246,9 @@ public class Camera: NSObject {
     public func enableMetadataOutput(for metadataObjectTypes: [AVMetadataObject.ObjectType], on queue: DispatchQueue = .main, delegate: AVCaptureMetadataOutputObjectsDelegate) throws {
         assert(self.metadataOutput == nil)
         self.captureSession.beginConfiguration()
+        defer {
+            self.captureSession.commitConfiguration()
+        }
         if let output = self.metadataOutput {
             self.captureSession.removeOutput(output)
         }
@@ -245,7 +261,6 @@ public class Camera: NSObject {
             throw Error.cannotAddOutput
         }
         output.metadataObjectTypes = metadataObjectTypes
-        self.captureSession.commitConfiguration()
     }
     
     public func disableMetadataOutput() {
@@ -296,9 +311,13 @@ public class Camera: NSObject {
     public func enableSynchronizedVideoAndDepthDataOutput(on queue: DispatchQueue, delegate: AVCaptureDataOutputSynchronizerDelegate) throws {
         assert(self.videoDataOutput == nil)
         assert(self.outputSynchronizer == nil)
-        
+        if self.videoDevice == nil {
+            try self.switchToVideoCaptureDevice(with: self.defaultCameraPosition)
+        }
         self.captureSession.beginConfiguration()
-        
+        defer {
+            self.captureSession.commitConfiguration()
+        }
         if let output = self.videoDataOutput {
             self.captureSession.removeOutput(output)
         }
@@ -327,7 +346,6 @@ public class Camera: NSObject {
         if let connection = self.videoCaptureConnection {
             self.configurator.videoConnectionConfigurator(self, connection)
         }
-        self.captureSession.commitConfiguration()
     }
     
     @available(iOS 11.0, *)
