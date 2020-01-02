@@ -29,6 +29,9 @@ public class DeviceOrientationTracker {
     // Access in main queue.
     public var deviceOrientation: UIDeviceOrientation = .unknown
     
+    // Access in main queue.
+    public var videoOrientation: AVCaptureVideoOrientation = .portrait
+    
     public weak var delegate: DeviceOrientationTrackerDelegate?
     
     public init(updateInterval: TimeInterval = 0.33, delegate: DeviceOrientationTrackerDelegate? = nil) {
@@ -123,6 +126,18 @@ public class DeviceOrientationTracker {
         if _deviceOrientation != deviceOrientation {
             _deviceOrientation = deviceOrientation
             DispatchQueue.main.async {
+                switch deviceOrientation {
+                case .landscapeLeft:
+                    self.videoOrientation = .landscapeRight
+                case .landscapeRight:
+                    self.videoOrientation = .landscapeLeft
+                case .portrait:
+                    self.videoOrientation = .portrait
+                case .portraitUpsideDown:
+                    self.videoOrientation = .portraitUpsideDown
+                default:
+                    break
+                }
                 self.deviceOrientation = deviceOrientation
                 self.delegate?.deviceOrientationUpdated(tracker: self, orientation: deviceOrientation)
             }
