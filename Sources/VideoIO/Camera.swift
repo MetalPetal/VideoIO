@@ -115,15 +115,8 @@ public class Camera: NSObject {
         }
         let discoverySession = AVCaptureDevice.DiscoverySession(deviceTypes: deviceTypes, mediaType: .video, position: position)
         if let device = discoverySession.devices.first {
-            try device.lockForConfiguration()
-            self.configurator.videoDeviceConfigurator(self, device)
-            device.unlockForConfiguration()
-            
             let newVideoDeviceInput = try AVCaptureDeviceInput(device: device)
             self.captureSession.beginConfiguration()
-            defer {
-                self.captureSession.commitConfiguration()
-            }
             if let currentVideoDeviceInput = self.videoDeviceInput {
                 self.captureSession.removeInput(currentVideoDeviceInput)
             }
@@ -131,12 +124,18 @@ public class Camera: NSObject {
                 self.captureSession.addInput(newVideoDeviceInput)
                 self.videoDeviceInput = newVideoDeviceInput
             } else {
+                self.captureSession.commitConfiguration()
                 throw Error.cannotAddInput
             }
-            
+                        
             if let connection = self.videoCaptureConnection {
                 self.configurator.videoConnectionConfigurator(self, connection)
             }
+            self.captureSession.commitConfiguration()
+            
+            try device.lockForConfiguration()
+            self.configurator.videoDeviceConfigurator(self, device)
+            device.unlockForConfiguration()
         } else {
             throw Error.noDeviceFound
         }
