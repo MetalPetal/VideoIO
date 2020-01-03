@@ -73,7 +73,7 @@ public class Camera: NSObject {
     }
     
     /// Start the capture session. Completion handler is called when the session is started, called on main queue.
-    public func startRunningCaptureSession(completion: (() -> Void)? = nil) {
+    public func startRunningCaptureSession() {
         if !self.captureSession.isRunning {
             self.captureSession.startRunning()
         }
