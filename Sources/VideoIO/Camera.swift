@@ -198,6 +198,7 @@ public class Camera: NSObject {
             if let device = AVCaptureDevice.default(for: .audio), let audioDeviceInput = try? AVCaptureDeviceInput(device: device) {
                 if self.captureSession.canAddInput(audioDeviceInput) {
                     self.captureSession.addInput(audioDeviceInput)
+                    self.audioDeviceInput = audioDeviceInput
                 } else {
                     throw Error.cannotAddInput
                 }
