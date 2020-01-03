@@ -12,7 +12,7 @@ import AVFoundation
 extension Camera {
     
     @available(macOS, unavailable)
-    func setFocusExposurePointOfInterest(to devicePoint: CGPoint, focusMode: AVCaptureDevice.FocusMode = .continuousAutoFocus, exposureMode: AVCaptureDevice.ExposureMode = .continuousAutoExposure, shouldMonitorSubjectAreaChange: Bool = false) throws {
+    public func setFocusExposurePointOfInterest(to devicePoint: CGPoint, focusMode: AVCaptureDevice.FocusMode = .continuousAutoFocus, exposureMode: AVCaptureDevice.ExposureMode = .continuousAutoExposure, shouldMonitorSubjectAreaChange: Bool = false) throws {
         guard let videoDevice = self.videoDevice else {
             return
         }
@@ -29,7 +29,7 @@ extension Camera {
         videoDevice.unlockForConfiguration()
     }
     
-    func setFocusExposurePointOfInterest(to devicePoint: CGPoint, focusMode: AVCaptureDevice.FocusMode = .continuousAutoFocus, exposureMode: AVCaptureDevice.ExposureMode = .continuousAutoExposure) throws {
+    public func setFocusExposurePointOfInterest(to devicePoint: CGPoint, focusMode: AVCaptureDevice.FocusMode = .continuousAutoFocus, exposureMode: AVCaptureDevice.ExposureMode = .continuousAutoExposure) throws {
         guard let videoDevice = self.videoDevice else {
             return
         }
@@ -46,7 +46,7 @@ extension Camera {
     }
     
     @available(macOS, unavailable)
-    func setExposureTargetBias(_ bias: Float, completion: ((CMTime) -> Void)? = nil) throws {
+    public func setExposureTargetBias(_ bias: Float, completion: ((CMTime) -> Void)? = nil) throws {
         guard let device = self.videoDevice else {
             return
         }
@@ -57,7 +57,7 @@ extension Camera {
         device.unlockForConfiguration()
     }
     
-    func captureDevicePointOfInterest(for point: CGPoint, inPreviewBounds: CGRect, videoGravity: AVLayerVideoGravity) -> CGPoint {
+    public func captureDevicePointOfInterest(for point: CGPoint, inPreviewBounds: CGRect, videoGravity: AVLayerVideoGravity) -> CGPoint {
         guard let device = self.videoDevice, let connection = self.videoCaptureConnection else { return CGPoint(x: 0.5, y: 0.5) }
         
         var point = point
@@ -153,7 +153,7 @@ extension Camera {
         return CGPoint(x: xInVideo / videoWidth, y: yInVideo / videoHeight)
     }
     
-    func captureDevicePointOfInterestForPointInOutputImage(_ point: CGPoint) -> CGPoint {
+    public func captureDevicePointOfInterestForPointInOutputImage(_ point: CGPoint) -> CGPoint {
         guard let output = self.videoDataOutput else { return CGPoint(x: 0.5, y: 0.5) }
         return output.metadataOutputRectConverted(fromOutputRect: CGRect(origin: point, size: .zero)).origin
     }
