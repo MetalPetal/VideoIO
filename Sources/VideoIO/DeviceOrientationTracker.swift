@@ -34,6 +34,8 @@ public class DeviceOrientationTracker {
     
     public weak var delegate: DeviceOrientationTrackerDelegate?
     
+    public private(set) var isStarted: Bool = false
+    
     public init(updateInterval: TimeInterval = 0.33, delegate: DeviceOrientationTrackerDelegate? = nil) {
         queue = OperationQueue()
         queue.maxConcurrentOperationCount = 1
@@ -149,6 +151,11 @@ public class DeviceOrientationTracker {
             assertionFailure()
             return
         }
+        if isStarted {
+            assertionFailure("Already started.")
+            return
+        }
+        isStarted = true
         motionManager.startDeviceMotionUpdates(to: queue) { [weak self] (motionData, error) in
             guard let strongSelf = self, let motionData = motionData else {
                 return
@@ -159,6 +166,7 @@ public class DeviceOrientationTracker {
     
     public func stop() {
         motionManager.stopAccelerometerUpdates()
+        isStarted = false
     }
 }
 
