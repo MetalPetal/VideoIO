@@ -2,7 +2,7 @@
 
 ![](https://github.com/MetalPetal/VideoIO/workflows/Swift/badge.svg)
 
-**[WIP]** Video Input/Output Utilities
+Video Input/Output Utilities
 
 ## VideoComposition
 
