@@ -102,7 +102,9 @@ public class Camera: NSObject {
             #if os(macOS)
             deviceTypes = [.builtInWideAngleCamera]
             #else
-            if #available(iOS 11.1, *) {
+            if #available(iOS 13.0, *) {
+                deviceTypes = [.builtInDualWideCamera, .builtInDualCamera, .builtInTrueDepthCamera, .builtInWideAngleCamera]
+            } else if #available(iOS 11.1, *) {
                 deviceTypes = [.builtInDualCamera, .builtInTrueDepthCamera, .builtInWideAngleCamera]
             } else if #available(iOS 10.2, *) {
                 deviceTypes = [.builtInDualCamera, .builtInWideAngleCamera]
