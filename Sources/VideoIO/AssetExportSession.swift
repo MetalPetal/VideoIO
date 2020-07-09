@@ -346,7 +346,9 @@ public class AssetExportSession {
         }
         self.cancelled = true
         self.queue.async {
-            self.reader.cancelReading()
+            if self.reader.status == .reading {
+                self.reader.cancelReading()
+            }
         }
     }
     
