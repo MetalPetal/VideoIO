@@ -181,12 +181,11 @@ public class AssetExportSession {
     
     private func encode(from output: AVAssetReaderOutput, to input: AVAssetWriterInput) -> Bool {
         while input.isReadyForMoreMediaData {
+            if self.reader.status != .reading || self.writer.status != .writing {
+                return false
+            }
             self.pauseDispatchGroup.wait()
-            
             if let buffer = output.copyNextSampleBuffer() {
-                if self.reader.status != .reading || self.writer.status != .writing {
-                    return false
-                }
                 if self.videoOutput === output {
                     let units = Int64((CMSampleBufferGetPresentationTimeStamp(buffer) - self.configuration.timeRange.start).seconds * 1000)
                     DispatchQueue.main.async {
@@ -212,8 +211,8 @@ public class AssetExportSession {
     private var progressHandler: ((Progress) -> Void)?
 
     public func export(progress: ((Progress) -> Void)?, completion: @escaping (Swift.Error?) -> Void) {
-        assert(self.status == .idle)
-        if self.status != .idle {
+        assert(status == .idle && cancelled == false)
+        if self.status != .idle || cancelled {
             DispatchQueue.main.async {
                 completion(Error.invalidStatus)
             }
@@ -288,6 +287,17 @@ public class AssetExportSession {
     
     private func finish(completionHandler: @escaping (Swift.Error?) -> Void) {
         if self.reader.status == .cancelled || self.writer.status == .cancelled {
+            if self.writer.status != .cancelled {
+                self.writer.cancelWriting()
+            } else {
+                assertionFailure("Internal error. Please file a bug report.")
+            }
+            
+            if self.reader.status != .cancelled {
+                assertionFailure("Internal error. Please file a bug report.")
+                self.reader.cancelReading()
+            }
+            
             try? FileManager().removeItem(at: self.outputURL)
             self.dispatchCallback(with: Error.cancelled, completionHandler)
             return
@@ -337,7 +347,6 @@ public class AssetExportSession {
         self.cancelled = true
         self.queue.async {
             self.reader.cancelReading()
-            self.writer.cancelWriting()
         }
     }
     

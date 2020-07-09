@@ -46,6 +46,38 @@ final class VideoIOTests: XCTestCase {
         try? fileManager.removeItem(at: tempURL)
     }
     
+    func testVideoExportCancel() {
+        let fileManager = FileManager()
+        let tempURL = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString).appendingPathExtension("mp4")
+        let asset = AVURLAsset(url: testMovieURL)
+        let expectation = XCTestExpectation()
+        let exporter = try! AssetExportSession(asset: asset, outputURL: tempURL, configuration: AssetExportSession.Configuration(fileType: AssetExportSession.fileType(for: tempURL)!, videoSettings: .h264(videoSize: asset.presentationVideoSize!), audioSettings: .aac(channels: 2, sampleRate: 44100, bitRate: 96 * 1024)))
+        exporter.export(progress: nil) { error in
+            XCTAssert((error as? AssetExportSession.Error) == .cancelled)
+            expectation.fulfill()
+        }
+        exporter.cancel()
+        wait(for: [expectation], timeout: 10.0)
+        try? fileManager.removeItem(at: tempURL)
+    }
+    
+    func testVideoExportCancel_delay() {
+        let fileManager = FileManager()
+        let tempURL = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString).appendingPathExtension("mp4")
+        let asset = AVURLAsset(url: testMovieURL)
+        let expectation = XCTestExpectation()
+        let exporter = try! AssetExportSession(asset: asset, outputURL: tempURL, configuration: AssetExportSession.Configuration(fileType: AssetExportSession.fileType(for: tempURL)!, videoSettings: .h264(videoSize: asset.presentationVideoSize!), audioSettings: .aac(channels: 2, sampleRate: 44100, bitRate: 96 * 1024)))
+        exporter.export(progress: nil) { error in
+            XCTAssert((error as? AssetExportSession.Error) == .cancelled)
+            expectation.fulfill()
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            exporter.cancel()
+        }
+        wait(for: [expectation], timeout: 10.0)
+        try? fileManager.removeItem(at: tempURL)
+    }
+    
     func testSampleBufferUtilities() {
         var oldPixelBuffer: CVPixelBuffer?
         CVPixelBufferCreate(nil, 1280, 720, kCVPixelFormatType_32BGRA, [:] as CFDictionary, &oldPixelBuffer)
