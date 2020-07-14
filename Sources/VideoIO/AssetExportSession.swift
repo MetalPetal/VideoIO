@@ -275,7 +275,7 @@ public class AssetExportSession {
             videoInput.requestMediaDataWhenReady(on: self.queue) { [weak self] in
                 guard let self = self else { return }
                 if !self.encode(from: videoOutput, to: videoInput) {
-                    if self.isAudioCompleted {
+                    if self.isCompleted {
                         self.finish(completionHandler: completion)
                     }
                 }
@@ -288,7 +288,7 @@ public class AssetExportSession {
             audioInput.requestMediaDataWhenReady(on: self.queue) { [weak self] in
                 guard let self = self else { return }
                 if !self.encode(from: audioOutput, to: audioInput) {
-                    if self.isVideoCompleted {
+                    if self.isCompleted {
                         self.finish(completionHandler: completion)
                     }
                 }
