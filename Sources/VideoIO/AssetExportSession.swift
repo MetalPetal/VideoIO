@@ -79,6 +79,13 @@ public class AssetExportSession {
     
     private let pauseDispatchGroup = DispatchGroup()
     private var cancelled: Bool = false
+
+    private var isAudioCompleted: Bool = false
+    private var isVideoCompleted: Bool = false
+
+    private var isCompleted: Bool {
+        isAudioCompleted && isVideoCompleted
+    }
     
     public init(asset: AVAsset, outputURL: URL, configuration: Configuration) throws {
         self.asset = asset.copy() as! AVAsset
@@ -200,7 +207,16 @@ public class AssetExportSession {
                     return false
                 }
             } else {
-                if output.mediaType == .video {
+                switch output.mediaType {
+                case .audio:
+                    isAudioCompleted = true
+                case .video:
+                    isVideoCompleted = true
+                default:
+                    break
+                }
+
+                if isCompleted {
                     DispatchQueue.main.async {
                         if let progress = self.progress {
                             progress.completedUnitCount = progress.totalUnitCount
@@ -208,7 +224,7 @@ public class AssetExportSession {
                         }
                     }
                 }
-
+                
                 input.markAsFinished()
                 return false
             }
@@ -255,35 +271,30 @@ public class AssetExportSession {
         self.status = .exporting
         self.writer.startSession(atSourceTime: configuration.timeRange.start)
         
-        var videoCompleted = false
-        var audioCompleted = false
-
         if let videoInput = self.videoInput, let videoOutput = self.videoOutput {
             videoInput.requestMediaDataWhenReady(on: self.queue) { [weak self] in
-                guard let strongSelf = self else { return }
-                if !strongSelf.encode(from: videoOutput, to: videoInput) {
-                    videoCompleted = true
-                    if audioCompleted {
-                        strongSelf.finish(completionHandler: completion)
+                guard let self = self else { return }
+                if !self.encode(from: videoOutput, to: videoInput) {
+                    if self.isAudioCompleted {
+                        self.finish(completionHandler: completion)
                     }
                 }
             }
         } else {
-            videoCompleted = true
+            isVideoCompleted = true
         }
         
         if let audioInput = self.audioInput, let audioOutput = self.audioOutput {
             audioInput.requestMediaDataWhenReady(on: self.queue) { [weak self] in
-                guard let strongSelf = self else { return }
-                if !strongSelf.encode(from: audioOutput, to: audioInput) {
-                    audioCompleted = true
-                    if videoCompleted {
-                        strongSelf.finish(completionHandler: completion)
+                guard let self = self else { return }
+                if !self.encode(from: audioOutput, to: audioInput) {
+                    if self.isVideoCompleted {
+                        self.finish(completionHandler: completion)
                     }
                 }
             }
         } else {
-            audioCompleted = true
+            isAudioCompleted = true
         }
     }
     
