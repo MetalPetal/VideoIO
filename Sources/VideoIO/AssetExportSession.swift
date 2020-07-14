@@ -200,6 +200,15 @@ public class AssetExportSession {
                     return false
                 }
             } else {
+                if output.mediaType == .video {
+                    DispatchQueue.main.async {
+                        if let progress = self.progress {
+                            progress.completedUnitCount = progress.totalUnitCount
+                            self.progressHandler?(progress)
+                        }
+                    }
+                }
+
                 input.markAsFinished()
                 return false
             }
