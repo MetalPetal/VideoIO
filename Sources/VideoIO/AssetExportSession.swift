@@ -186,20 +186,31 @@ public class AssetExportSession {
             }
             self.pauseDispatchGroup.wait()
             if let buffer = output.copyNextSampleBuffer() {
+                let progress = (CMSampleBufferGetPresentationTimeStamp(buffer) - self.configuration.timeRange.start).seconds/self.duration.seconds
                 if self.videoOutput === output {
-                    let units = Int64((CMSampleBufferGetPresentationTimeStamp(buffer) - self.configuration.timeRange.start).seconds * 1000)
-                    DispatchQueue.main.async {
-                        if let progress = self.progress {
-                            progress.completedUnitCount = units
-                            self.progressHandler?(progress)
-                        }
+                    self.dispatchProgressCallback {
+                        self.progress?.updateVideoEncodingProgress(fractionCompleted: progress)
                     }
                 }
-                
+                if self.audioOutput === output {
+                    self.dispatchProgressCallback {
+                        self.progress?.updateAudioEncodingProgress(fractionCompleted: progress)
+                    }
+                }
                 if !input.append(buffer) {
                     return false
                 }
             } else {
+                if self.videoOutput === output {
+                    self.dispatchProgressCallback {
+                        self.progress?.updateVideoEncodingProgress(fractionCompleted: 1)
+                    }
+                }
+                if self.audioOutput === output {
+                    self.dispatchProgressCallback {
+                        self.progress?.updateAudioEncodingProgress(fractionCompleted: 1)
+                    }
+                }
                 input.markAsFinished()
                 return false
             }
@@ -207,10 +218,53 @@ public class AssetExportSession {
         return true
     }
     
-    private var progress: Progress?
-    private var progressHandler: ((Progress) -> Void)?
+    
+    public class ExportProgress: Progress {
+        public let videoEncodingProgress: Progress?
+        public let audioEncodingProgress: Progress?
+        public let finishWritingProgress: Progress
+        
+        private let childProgressTotalUnitCount: Int64 = 10000
+        
+        fileprivate init(tracksAudioEncoding: Bool, tracksVideoEncoding: Bool) {
+            finishWritingProgress = Progress(totalUnitCount: childProgressTotalUnitCount)
+            audioEncodingProgress = tracksAudioEncoding ? Progress(totalUnitCount: childProgressTotalUnitCount) : nil
+            videoEncodingProgress = tracksVideoEncoding ? Progress(totalUnitCount: childProgressTotalUnitCount) : nil
+            
+            super.init(parent: nil, userInfo: nil)
+            
+            let pendingUnitCount: Int64 = 1
+            self.addChild(finishWritingProgress, withPendingUnitCount: pendingUnitCount)
+            self.totalUnitCount += pendingUnitCount
+            
+            if let progress = audioEncodingProgress {
+                let pendingUnitCount: Int64 = 5000
+                self.addChild(progress, withPendingUnitCount: pendingUnitCount)
+                self.totalUnitCount += pendingUnitCount
+            }
+            
+            if let progress = videoEncodingProgress {
+                let pendingUnitCount: Int64 = 5000
+                self.addChild(progress, withPendingUnitCount: pendingUnitCount)
+                self.totalUnitCount += pendingUnitCount
+            }
+        }
+        
+        fileprivate func updateVideoEncodingProgress(fractionCompleted: Double) {
+            self.videoEncodingProgress?.completedUnitCount = Int64(Double(childProgressTotalUnitCount) * fractionCompleted)
+        }
+        fileprivate func updateAudioEncodingProgress(fractionCompleted: Double) {
+            self.audioEncodingProgress?.completedUnitCount = Int64(Double(childProgressTotalUnitCount) * fractionCompleted)
+        }
+        fileprivate func updateFinishWritingProgress(fractionCompleted: Double) {
+            self.finishWritingProgress.completedUnitCount = Int64(Double(childProgressTotalUnitCount) * fractionCompleted)
+        }
+    }
+    
+    private var progress: ExportProgress?
+    private var progressHandler: ((ExportProgress) -> Void)?
 
-    public func export(progress: ((Progress) -> Void)?, completion: @escaping (Swift.Error?) -> Void) {
+    public func export(progress: ((ExportProgress) -> Void)?, completion: @escaping (Swift.Error?) -> Void) {
         assert(status == .idle && cancelled == false)
         if self.status != .idle || cancelled {
             DispatchQueue.main.async {
@@ -219,8 +273,8 @@ public class AssetExportSession {
             return
         }
         
-        self.progress = Progress(totalUnitCount: Int64(self.duration.seconds * 1000))
         self.progressHandler = progress
+        self.progress = ExportProgress(tracksAudioEncoding: self.audioInput != nil, tracksVideoEncoding: self.videoInput != nil)
         
         do {
             guard self.writer.startWriting() else {
@@ -278,8 +332,18 @@ public class AssetExportSession {
         }
     }
     
+    private func dispatchProgressCallback(with updater: @escaping () -> Void) {
+        DispatchQueue.main.async {
+            if let progress = self.progress {
+                updater()
+                self.progressHandler?(progress)
+            }
+        }
+    }
+    
     private func dispatchCallback(with error: Swift.Error?, _ completionHandler: @escaping (Swift.Error?) -> Void) {
         DispatchQueue.main.async {
+            self.progressHandler = nil
             self.status = .completed
             completionHandler(error)
         }
@@ -315,6 +379,11 @@ public class AssetExportSession {
                 guard let strongSelf = self else { return }
                 if strongSelf.writer.status == .failed {
                     try? FileManager().removeItem(at: strongSelf.outputURL)
+                }
+                if strongSelf.writer.error == nil {
+                    strongSelf.dispatchProgressCallback {
+                        strongSelf.progress?.updateFinishWritingProgress(fractionCompleted: 1)
+                    }
                 }
                 strongSelf.dispatchCallback(with: strongSelf.writer.error, completionHandler)
             }

@@ -37,9 +37,16 @@ final class VideoIOTests: XCTestCase {
         let asset = AVURLAsset(url: testMovieURL)
         let expectation = XCTestExpectation()
         let exporter = try! AssetExportSession(asset: asset, outputURL: tempURL, configuration: AssetExportSession.Configuration(fileType: AssetExportSession.fileType(for: tempURL)!, videoSettings: .h264(videoSize: asset.presentationVideoSize!), audioSettings: .aac(channels: 2, sampleRate: 44100, bitRate: 96 * 1024)))
-        exporter.export(progress: nil) { error in
+        var overallProgress: Double = 0
+        var videoProgress: Double = 0
+        exporter.export(progress: { progress in
+            videoProgress = progress.videoEncodingProgress!.fractionCompleted
+            overallProgress = progress.fractionCompleted
+        }) { error in
             XCTAssert(error == nil)
             XCTAssert(try! tempURL.resourceValues(forKeys: Set<URLResourceKey>([.fileSizeKey])).fileSize! > 0)
+            XCTAssert(overallProgress == 1)
+            XCTAssert(videoProgress == 1)
             expectation.fulfill()
         }
         wait(for: [expectation], timeout: 10.0)
@@ -67,8 +74,12 @@ final class VideoIOTests: XCTestCase {
         let asset = AVURLAsset(url: testMovieURL)
         let expectation = XCTestExpectation()
         let exporter = try! AssetExportSession(asset: asset, outputURL: tempURL, configuration: AssetExportSession.Configuration(fileType: AssetExportSession.fileType(for: tempURL)!, videoSettings: .h264(videoSize: asset.presentationVideoSize!), audioSettings: .aac(channels: 2, sampleRate: 44100, bitRate: 96 * 1024)))
-        exporter.export(progress: nil) { error in
+        var overallProgress: Double = 0
+        exporter.export(progress: { progress in
+            overallProgress = progress.fractionCompleted
+        }) { error in
             XCTAssert((error as? AssetExportSession.Error) == .cancelled)
+            XCTAssert(overallProgress != 1)
             expectation.fulfill()
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
