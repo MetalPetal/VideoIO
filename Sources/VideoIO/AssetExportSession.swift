@@ -182,6 +182,7 @@ public class AssetExportSession {
     private func encode(from output: AVAssetReaderOutput, to input: AVAssetWriterInput) -> Bool {
         while input.isReadyForMoreMediaData {
             if self.reader.status != .reading || self.writer.status != .writing {
+                input.markAsFinished()
                 return false
             }
             self.pauseDispatchGroup.wait()
@@ -194,6 +195,7 @@ public class AssetExportSession {
                     self.dispatchProgressCallback { $0.updateAudioEncodingProgress(fractionCompleted: progress) }
                 }
                 if !input.append(buffer) {
+                    input.markAsFinished()
                     return false
                 }
             } else {
