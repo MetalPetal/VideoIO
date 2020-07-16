@@ -89,6 +89,33 @@ final class VideoIOTests: XCTestCase {
         try? fileManager.removeItem(at: tempURL)
     }
     
+    func testVideoExportCancel_lifecycle() {
+        let fileManager = FileManager()
+        let tempURL = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString).appendingPathExtension("mp4")
+        let asset = AVURLAsset(url: testMovieURL)
+        let expectation = XCTestExpectation()
+        var exporter: AssetExportSession? = try! AssetExportSession(asset: asset, outputURL: tempURL, configuration: AssetExportSession.Configuration(fileType: AssetExportSession.fileType(for: tempURL)!, videoSettings: .h264(videoSize: asset.presentationVideoSize!), audioSettings: .aac(channels: 2, sampleRate: 44100, bitRate: 96 * 1024)))
+        weak var weakExporter = exporter
+        var overallProgress: Double = 0
+        exporter?.export(progress: { progress in
+            overallProgress = progress.fractionCompleted
+        }) { error in
+            XCTAssert(weakExporter != nil)
+            XCTAssert((error as? AssetExportSession.Error) == .cancelled)
+            XCTAssert(overallProgress != 1)
+            DispatchQueue.main.async {
+                expectation.fulfill()
+            }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            exporter?.cancel()
+            exporter = nil
+        }
+        wait(for: [expectation], timeout: 10.0)
+        try? fileManager.removeItem(at: tempURL)
+        XCTAssert(weakExporter == nil)
+    }
+    
     func testSampleBufferUtilities() {
         var oldPixelBuffer: CVPixelBuffer?
         CVPixelBufferCreate(nil, 1280, 720, kCVPixelFormatType_32BGRA, [:] as CFDictionary, &oldPixelBuffer)
