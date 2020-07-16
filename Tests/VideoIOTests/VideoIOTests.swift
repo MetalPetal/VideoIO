@@ -11,7 +11,7 @@ extension CMSampleTimingInfo: Equatable {
 @available(iOS 10.0, macOS 10.13, *)
 final class VideoIOTests: XCTestCase {
     
-    let testMovieURL = URL(fileURLWithPath: "\(#file)").deletingLastPathComponent().appendingPathComponent("test.mov")
+    let testMovieURL = URL(fileURLWithPath: "\(#file)").deletingLastPathComponent().appendingPathComponent("ElephantsDream.mp4")
     
     func testAudioVideoSettings() {
         // This is an example of a functional test case.
