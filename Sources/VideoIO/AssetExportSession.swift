@@ -188,28 +188,20 @@ public class AssetExportSession {
             if let buffer = output.copyNextSampleBuffer() {
                 let progress = (CMSampleBufferGetPresentationTimeStamp(buffer) - self.configuration.timeRange.start).seconds/self.duration.seconds
                 if self.videoOutput === output {
-                    self.dispatchProgressCallback {
-                        self.progress?.updateVideoEncodingProgress(fractionCompleted: progress)
-                    }
+                    self.dispatchProgressCallback { $0.updateVideoEncodingProgress(fractionCompleted: progress) }
                 }
                 if self.audioOutput === output {
-                    self.dispatchProgressCallback {
-                        self.progress?.updateAudioEncodingProgress(fractionCompleted: progress)
-                    }
+                    self.dispatchProgressCallback { $0.updateAudioEncodingProgress(fractionCompleted: progress) }
                 }
                 if !input.append(buffer) {
                     return false
                 }
             } else {
                 if self.videoOutput === output {
-                    self.dispatchProgressCallback {
-                        self.progress?.updateVideoEncodingProgress(fractionCompleted: 1)
-                    }
+                    self.dispatchProgressCallback { $0.updateVideoEncodingProgress(fractionCompleted: 1) }
                 }
                 if self.audioOutput === output {
-                    self.dispatchProgressCallback {
-                        self.progress?.updateAudioEncodingProgress(fractionCompleted: 1)
-                    }
+                    self.dispatchProgressCallback { $0.updateAudioEncodingProgress(fractionCompleted: 1) }
                 }
                 input.markAsFinished()
                 return false
@@ -266,15 +258,12 @@ public class AssetExportSession {
 
     public func export(progress: ((ExportProgress) -> Void)?, completion: @escaping (Swift.Error?) -> Void) {
         assert(status == .idle && cancelled == false)
-        if self.status != .idle || cancelled {
+        if self.status != .idle || self.cancelled {
             DispatchQueue.main.async {
                 completion(Error.invalidStatus)
             }
             return
         }
-        
-        self.progressHandler = progress
-        self.progress = ExportProgress(tracksAudioEncoding: self.audioInput != nil, tracksVideoEncoding: self.videoInput != nil)
         
         do {
             guard self.writer.startWriting() else {
@@ -295,21 +284,27 @@ public class AssetExportSession {
             DispatchQueue.main.async {
                 completion(error)
             }
+            return
         }
         
         self.status = .exporting
+        self.progressHandler = progress
+        self.progress = ExportProgress(tracksAudioEncoding: self.audioInput != nil, tracksVideoEncoding: self.videoInput != nil)
+        
         self.writer.startSession(atSourceTime: configuration.timeRange.start)
         
         var videoCompleted = false
         var audioCompleted = false
 
         if let videoInput = self.videoInput, let videoOutput = self.videoOutput {
-            videoInput.requestMediaDataWhenReady(on: self.queue) { [weak self] in
-                guard let strongSelf = self else { return }
-                if !strongSelf.encode(from: videoOutput, to: videoInput) {
+            var sessionForVideoEncoder: AssetExportSession? = self
+            videoInput.requestMediaDataWhenReady(on: self.queue) { [unowned videoInput] in
+                guard let session = sessionForVideoEncoder else { return }
+                if !session.encode(from: videoOutput, to: videoInput) {
                     videoCompleted = true
+                    sessionForVideoEncoder = nil
                     if audioCompleted {
-                        strongSelf.finish(completionHandler: completion)
+                        session.finish(completionHandler: completion)
                     }
                 }
             }
@@ -318,12 +313,14 @@ public class AssetExportSession {
         }
         
         if let audioInput = self.audioInput, let audioOutput = self.audioOutput {
-            audioInput.requestMediaDataWhenReady(on: self.queue) { [weak self] in
-                guard let strongSelf = self else { return }
-                if !strongSelf.encode(from: audioOutput, to: audioInput) {
+            var sessionForAudioEncoder: AssetExportSession? = self
+            audioInput.requestMediaDataWhenReady(on: self.queue) { [unowned audioInput] in
+                guard let session = sessionForAudioEncoder else { return }
+                if !session.encode(from: audioOutput, to: audioInput) {
                     audioCompleted = true
+                    sessionForAudioEncoder = nil
                     if videoCompleted {
-                        strongSelf.finish(completionHandler: completion)
+                        session.finish(completionHandler: completion)
                     }
                 }
             }
@@ -332,10 +329,10 @@ public class AssetExportSession {
         }
     }
     
-    private func dispatchProgressCallback(with updater: @escaping () -> Void) {
+    private func dispatchProgressCallback(with updater: @escaping (ExportProgress) -> Void) {
         DispatchQueue.main.async {
             if let progress = self.progress {
-                updater()
+                updater(progress)
                 self.progressHandler?(progress)
             }
         }
@@ -350,6 +347,8 @@ public class AssetExportSession {
     }
     
     private func finish(completionHandler: @escaping (Swift.Error?) -> Void) {
+        dispatchPrecondition(condition: DispatchPredicate.onQueue(queue))
+        
         if self.reader.status == .cancelled || self.writer.status == .cancelled {
             if self.writer.status != .cancelled {
                 self.writer.cancelWriting()
@@ -375,17 +374,16 @@ public class AssetExportSession {
             self.writer.cancelWriting()
             self.dispatchCallback(with: self.reader.error, completionHandler)
         } else {
-            self.writer.finishWriting { [weak self] in
-                guard let strongSelf = self else { return }
-                if strongSelf.writer.status == .failed {
-                    try? FileManager().removeItem(at: strongSelf.outputURL)
-                }
-                if strongSelf.writer.error == nil {
-                    strongSelf.dispatchProgressCallback {
-                        strongSelf.progress?.updateFinishWritingProgress(fractionCompleted: 1)
+            self.writer.finishWriting {
+                self.queue.async {
+                    if self.writer.status == .failed {
+                        try? FileManager().removeItem(at: self.outputURL)
                     }
+                    if self.writer.error == nil {
+                        self.dispatchProgressCallback { $0.updateFinishWritingProgress(fractionCompleted: 1) }
+                    }
+                    self.dispatchCallback(with: self.writer.error, completionHandler)
                 }
-                strongSelf.dispatchCallback(with: strongSelf.writer.error, completionHandler)
             }
         }
     }
@@ -409,6 +407,9 @@ public class AssetExportSession {
     }
     
     public func cancel() {
+        if self.status == .paused {
+            self.resume()
+        }
         guard self.status == .exporting && self.cancelled == false else {
             assertionFailure("self.status == .exporting && self.cancelled == false")
             return
@@ -418,12 +419,6 @@ public class AssetExportSession {
             if self.reader.status == .reading {
                 self.reader.cancelReading()
             }
-        }
-    }
-    
-    deinit {
-        if self.status == .paused {
-            self.pauseDispatchGroup.leave()
         }
     }
 }
