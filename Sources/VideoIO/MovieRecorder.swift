@@ -121,6 +121,7 @@ public final class MovieRecorder {
             do {
                 self.assetWriter = try AVAssetWriter(url: self.url, fileType: .mp4)
                 self.assetWriter?.metadata = self.configuration.metadata
+                self.assetWriter?.shouldOptimizeForNetworkUse = true
                 self.statusLock.lock()
                 self.transitionToStatus(.recording, error: nil)
                 self.statusLock.unlock()
