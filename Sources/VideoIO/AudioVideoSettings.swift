@@ -15,6 +15,20 @@ extension AVVideoCodecType: Codable {
 
 public struct VideoSettings: Codable {
     
+    public struct ScalingMode: RawRepresentable {
+        public let rawValue: String
+        public init(rawValue: String) {
+            self.rawValue = rawValue
+        }
+        public init(_ value: String) {
+            self.init(rawValue: value)
+        }
+        public static let fit = ScalingMode(AVVideoScalingModeFit)
+        public static let resize = ScalingMode(AVVideoScalingModeResize)
+        public static let resizeAspect = ScalingMode(AVVideoScalingModeResizeAspect)
+        public static let resizeAspectFill = ScalingMode(AVVideoScalingModeResizeAspectFill)
+    }
+    
     public struct CompressionProperties: Codable {
         public var averageBitRate: Int?
         public var profileLevel: String?
@@ -66,6 +80,7 @@ public struct VideoSettings: Codable {
     public var width: Int
     public var height: Int
     public var codec: AVVideoCodecType
+    public var scalingMode: ScalingMode?
     
     public var compressionProperties: CompressionProperties?
     
@@ -92,6 +107,7 @@ public struct VideoSettings: Codable {
         public static let height = CodingKeys(AVVideoHeightKey)
         public static let codec = CodingKeys(AVVideoCodecKey)
         public static let compressionProperties = CodingKeys(AVVideoCompressionPropertiesKey)
+        public static let scalingMode = CodingKeys(AVVideoScalingModeKey)
     }
     
     public func encode(to encoder: Encoder) throws {
@@ -99,6 +115,7 @@ public struct VideoSettings: Codable {
         try container.encode(width, forKey: .width)
         try container.encode(height, forKey: .height)
         try container.encode(codec, forKey: .codec)
+        try container.encodeIfPresent(scalingMode?.rawValue, forKey: .scalingMode)
         try container.encodeIfPresent(compressionProperties, forKey: .compressionProperties)
     }
     
@@ -107,6 +124,7 @@ public struct VideoSettings: Codable {
         self.width = try container.decode(Int.self, forKey: .width)
         self.height = try container.decode(Int.self, forKey: .height)
         self.codec = try container.decode(AVVideoCodecType.self, forKey: .codec)
+        self.scalingMode = (try container.decodeIfPresent(String.self, forKey: .scalingMode)).map(ScalingMode.init(rawValue:))
         self.compressionProperties = try container.decodeIfPresent(CompressionProperties.self, forKey: .compressionProperties)
     }
     

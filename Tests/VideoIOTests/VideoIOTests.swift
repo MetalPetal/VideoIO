@@ -29,6 +29,14 @@ final class VideoIOTests: XCTestCase {
                                                                    AVVideoHeightKey: 720,
                                                                    AVVideoCodecKey: "avc1",
                                                                    AVVideoCompressionPropertiesKey: [AVVideoAverageBitRateKey: 3000000, AVVideoProfileLevelKey: AVVideoProfileLevelH264HighAutoLevel]] as NSDictionary)
+        
+        var videoSettings2: VideoSettings = .h264(videoSize: CGSize(width: 1280, height: 720), averageBitRate: 3000000)
+        videoSettings2.scalingMode = .resizeAspectFill
+        XCTAssert(videoSettings2.toDictionary() as NSDictionary == [AVVideoWidthKey: 1280,
+                                                                   AVVideoHeightKey: 720,
+                                                                   AVVideoCodecKey: "avc1",
+                                                                   AVVideoScalingModeKey: AVVideoScalingModeResizeAspectFill,
+                                                                   AVVideoCompressionPropertiesKey: [AVVideoAverageBitRateKey: 3000000, AVVideoProfileLevelKey: AVVideoProfileLevelH264HighAutoLevel]] as NSDictionary)
     }
     
     func testVideoExport() {
