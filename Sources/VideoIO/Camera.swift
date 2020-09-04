@@ -15,6 +15,7 @@ public class Camera: NSObject {
         case noDeviceFound
         case cannotAddInput
         case cannotAddOutput
+        case metadataObjectTypeNotAvailable
     }
     
     public struct Configurator {
@@ -262,7 +263,11 @@ public class Camera: NSObject {
         } else {
             throw Error.cannotAddOutput
         }
-        output.metadataObjectTypes = metadataObjectTypes
+        if Set(output.availableMetadataObjectTypes).intersection(Set(metadataObjectTypes)).count == metadataObjectTypes.count {
+            output.metadataObjectTypes = metadataObjectTypes
+        } else {
+            throw Error.metadataObjectTypeNotAvailable
+        }
     }
     
     public func disableMetadataOutput() {
