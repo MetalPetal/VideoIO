@@ -310,6 +310,10 @@ public final class MovieRecorder {
                     }
                     self.statusLock.unlock()
                 }
+            } else {
+                self.statusLock.lock()
+                self.transitionToStatus(.failed, error: self.assetWriter?.error ?? MovieRecorderError.cannotSetupInput)
+                self.statusLock.unlock()
             }
         }
     }

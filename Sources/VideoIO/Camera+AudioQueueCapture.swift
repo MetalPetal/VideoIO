@@ -31,7 +31,6 @@ extension Camera {
     
     @available(macOS, unavailable)
     public func disableAudioQueueCaptureDataOutput() {
-        assert(self.audioQueueCaptureSession != nil)
         if let session = self.audioQueueCaptureSession {
             session.stopAudioRecording()
         }
