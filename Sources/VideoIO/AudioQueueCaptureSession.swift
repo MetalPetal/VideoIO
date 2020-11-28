@@ -65,6 +65,13 @@ public class AudioQueueCaptureSession {
     private weak var delegate: AudioQueueCaptureSessionDelegate?
     private let delegateQueue: DispatchQueue
     
+    private struct ClientInfo {
+        weak var session: AudioQueueCaptureSession?
+        var timebaseInfo: mach_timebase_info_data_t
+    }
+    
+    private var clientInfo: ClientInfo?
+    
     public init(sampleRate: Double = 44100, delegate: AudioQueueCaptureSessionDelegate, delegateQueue: DispatchQueue = .main) {
         self.sampleRate = sampleRate
         self.delegate = delegate
@@ -151,27 +158,30 @@ public class AudioQueueCaptureSession {
                 return info
             }()
             
+            self.clientInfo = ClientInfo(session: self, timebaseInfo: timebaseInfo)
+            
             var audioQueue: AudioQueueRef!
-            let status = AudioQueueNewInputWithDispatchQueue(&audioQueue, &recordFormat, 0, self.queue) { [weak self] (inAudioQueue, bufferRef, startTime, inNumPackets, inPacketDesc) in
-                guard let strongSelf = self else { return }
+            let status = AudioQueueNewInput(&recordFormat, { (info, inAudioQueue, bufferRef, startTime, inNumPackets, inPacketDesc) in
+                guard let clientInfo = info?.assumingMemoryBound(to: ClientInfo.self).pointee else { return }
+                guard let session = clientInfo.session else { return }
                 if inNumPackets > 0 {
-                    let t = Double(startTime.pointee.mHostTime) * Double(timebaseInfo.numer) / Double(timebaseInfo.denom) / Double(NSEC_PER_SEC)
-                    let pts = CMTime(seconds: t, preferredTimescale: CMTimeScale(strongSelf.sampleRate))
+                    let t = Double(startTime.pointee.mHostTime) * Double(clientInfo.timebaseInfo.numer) / Double(clientInfo.timebaseInfo.denom) / Double(NSEC_PER_SEC)
+                    let pts = CMTime(seconds: t, preferredTimescale: CMTimeScale(session.sampleRate))
                     var dataBuffer: CMBlockBuffer?
                     CMBlockBufferCreateWithMemoryBlock(allocator: nil, memoryBlock: nil, blockLength: Int(bufferRef.pointee.mAudioDataByteSize), blockAllocator: nil, customBlockSource: nil, offsetToData: 0, dataLength: Int(bufferRef.pointee.mAudioDataByteSize), flags: 0, blockBufferOut: &dataBuffer)
-                    if let dataBuffer = dataBuffer, let formatDesc = strongSelf.audioFormatDescription {
+                    if let dataBuffer = dataBuffer, let formatDesc = session.audioFormatDescription {
                         CMBlockBufferReplaceDataBytes(with: bufferRef.pointee.mAudioData, blockBuffer: dataBuffer, offsetIntoDestination: 0, dataLength: Int(bufferRef.pointee.mAudioDataByteSize))
                         var sampleBuffer: CMSampleBuffer?
                         CMAudioSampleBufferCreateWithPacketDescriptions(allocator: nil, dataBuffer: dataBuffer, dataReady: true, makeDataReadyCallback: nil, refcon: nil, formatDescription: formatDesc, sampleCount: CMItemCount(inNumPackets), presentationTimeStamp: pts, packetDescriptions: inPacketDesc, sampleBufferOut: &sampleBuffer)
                         if let sampleBuffer = sampleBuffer {
                             //callback
-                            strongSelf.inflightBufferCountLock.lock()
-                            if strongSelf.inflightBufferCount < Constants.maximumInflightBuffers {
-                                strongSelf.inflightBufferCount += 1
-                                strongSelf.inflightBufferCountLock.unlock()
+                            session.inflightBufferCountLock.lock()
+                            if session.inflightBufferCount < Constants.maximumInflightBuffers {
+                                session.inflightBufferCount += 1
+                                session.inflightBufferCountLock.unlock()
                                 
-                                LifetimeTracker.attach(to: dataBuffer) { [weak self] in
-                                    guard let strongSelf = self else {
+                                LifetimeTracker.attach(to: dataBuffer) { [weak session] in
+                                    guard let strongSelf = session else {
                                         return
                                     }
                                     strongSelf.inflightBufferCountLock.lock()
@@ -179,18 +189,18 @@ public class AudioQueueCaptureSession {
                                     strongSelf.inflightBufferCount -= 1
                                 }
                                 
-                                strongSelf.delegateQueue.async {
-                                    strongSelf.delegate?.audioQueueCaptureSession(strongSelf, didOutputSampleBuffer: sampleBuffer)
+                                session.delegateQueue.async {
+                                    session.delegate?.audioQueueCaptureSession(session, didOutputSampleBuffer: sampleBuffer)
                                 }
                             } else {
-                                strongSelf.inflightBufferCountLock.unlock()
-                                print("\(strongSelf): Buffer dropped due to too many inflight buffer.")
+                                session.inflightBufferCountLock.unlock()
+                                print("\(session): Buffer dropped due to too many inflight buffer.")
                             }
                         }
                     }
                 }
                 AudioQueueEnqueueBuffer(inAudioQueue, bufferRef, 0, nil)
-            }
+            }, &self.clientInfo, nil, nil, 0, &audioQueue)
             
             if status != 0 {
                 throw Error.cannotCreateAudioQueue
@@ -207,18 +217,23 @@ public class AudioQueueCaptureSession {
             
             var size = UInt32(MemoryLayout.size(ofValue: recordFormat))
             if AudioQueueGetProperty(audioQueue, kAudioQueueProperty_StreamDescription, &recordFormat, &size) != 0 {
+                AudioQueueDispose(audioQueue, true)
                 throw Error.cannotGetAudioQueueProperty
             }
             
             var acl = AudioChannelLayout()
             acl.mChannelLayoutTag = kAudioChannelLayoutTag_Mono
             if CMAudioFormatDescriptionCreate(allocator: nil, asbd: &recordFormat, layoutSize: MemoryLayout.size(ofValue: acl), layout: &acl, magicCookieSize: 0, magicCookie: nil, extensions: nil, formatDescriptionOut: &self.audioFormatDescription) != 0 {
+                AudioQueueDispose(audioQueue, true)
                 throw Error.cannotCreateAudioFormatDescription
             }
             
             if AudioQueueStart(audioQueue, nil) != 0 {
+                AudioQueueDispose(audioQueue, true)
                 throw Error.cannotStartAudioQueue
             }
+            
+            self.audioQueue = audioQueue
         } else {
             throw Error.noInputAvailable
         }
@@ -240,6 +255,7 @@ public class AudioQueueCaptureSession {
             self.audioQueue = nil
         }
         self.audioFormatDescription = nil
+        self.clientInfo = nil
     }
     
 }
