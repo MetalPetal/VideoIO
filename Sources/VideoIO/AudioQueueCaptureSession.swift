@@ -27,7 +27,7 @@ public class AudioQueueCaptureSession {
     
     private struct Constants {
         static let numberOfBuffersInQueue = 30
-        static let maximumInflightBuffers = 15
+        static let maximumInflightBuffers = 30
     }
     
     private class LifetimeTracker {
