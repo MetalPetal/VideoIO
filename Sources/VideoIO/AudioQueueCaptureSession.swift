@@ -222,7 +222,15 @@ public class AudioQueueCaptureSession {
             }
             
             var acl = AudioChannelLayout()
-            acl.mChannelLayoutTag = kAudioChannelLayoutTag_Mono
+            switch recordFormat.mChannelsPerFrame {
+            case 2:
+                acl.mChannelLayoutTag = kAudioChannelLayoutTag_Stereo
+            case 1:
+                acl.mChannelLayoutTag = kAudioChannelLayoutTag_Mono
+            default:
+                print("[AudioQueueCaptureSession] Unsupported ChannelsPerFrame: \(recordFormat.mChannelsPerFrame), fallback to kAudioChannelLayoutTag_Mono.")
+                acl.mChannelLayoutTag = kAudioChannelLayoutTag_Mono
+            }
             if CMAudioFormatDescriptionCreate(allocator: nil, asbd: &recordFormat, layoutSize: MemoryLayout.size(ofValue: acl), layout: &acl, magicCookieSize: 0, magicCookie: nil, extensions: nil, formatDescriptionOut: &self.audioFormatDescription) != 0 {
                 AudioQueueDispose(audioQueue, true)
                 throw Error.cannotCreateAudioFormatDescription
