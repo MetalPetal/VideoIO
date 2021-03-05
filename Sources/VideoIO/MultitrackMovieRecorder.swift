@@ -2,7 +2,7 @@ import AVFoundation
 import CoreImage
 
 @available(iOS 11.0, macOS 10.14, *)
-class MultitrackMovieRecorder {
+public final class MultitrackMovieRecorder {
     
     public enum RecorderError: LocalizedError {
         case cannotSetupVideoInputs
