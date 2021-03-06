@@ -94,7 +94,18 @@ public final class MultitrackMovieRecorder {
         self.queue.sync { _duration }
     }
     
-    public var durationChangedHandler: ((CMTime) -> Void)?
+    public var sampleWritingSessionStartTime: CMTime? {
+        self.queue.sync {
+            if recordingStartSampleTime == .invalid {
+                return nil
+            } else {
+                return recordingStartSampleTime
+            }
+        }
+    }
+    
+    public var sampleWritingSessionStartedHandler: ((_ sampleWritingSessionStartTime: CMTime) -> Void)?
+    public var durationChangedHandler: ((_ duration: CMTime) -> Void)?
     
     private var lastVideoSampleTime: CMTime = .invalid
     private var recordingStartSampleTime: CMTime = .invalid
@@ -189,6 +200,9 @@ public final class MultitrackMovieRecorder {
                 self.assetWriter.startSession(atSourceTime: presentationTime)
                 self.recordingStartSampleTime = presentationTime
                 self.lastVideoSampleTime = presentationTime
+                DispatchQueue.main.async {
+                    self.sampleWritingSessionStartedHandler?(presentationTime)
+                }
             }
             
             if self.assetWriter.status == .writing {
