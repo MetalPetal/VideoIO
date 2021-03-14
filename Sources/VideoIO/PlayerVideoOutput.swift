@@ -8,6 +8,7 @@
 import Foundation
 import AVFoundation
 
+@available(tvOS 10.0, *)
 @available(macOS, unavailable)
 public class PlayerVideoOutput: NSObject {
     
@@ -211,6 +212,7 @@ public class PlayerVideoOutput: NSObject {
     }
 }
 
+@available(tvOS 10.0, *)
 @available(macOS, unavailable)
 extension PlayerVideoOutput: AVPlayerItemOutputPullDelegate {
     public func outputMediaDataWillChange(_ sender: AVPlayerItemOutput) {

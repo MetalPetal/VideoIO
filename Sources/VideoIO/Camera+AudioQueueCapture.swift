@@ -8,8 +8,9 @@
 import Foundation
 
 @available(iOS 10.0, macOS 10.15, *)
+@available(tvOS, unavailable)
 extension Camera {
-    
+    #if !os(tvOS)
     @available(macOS, unavailable)
     public func enableAudioQueueCaptureDataOutput(on queue: DispatchQueue = .main, delegate: AudioQueueCaptureSessionDelegate) throws {
         assert(self.audioDataOutput == nil)
@@ -36,4 +37,5 @@ extension Camera {
         }
         self.audioQueueCaptureSession = nil
     }
+    #endif
 }

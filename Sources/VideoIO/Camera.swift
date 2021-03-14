@@ -9,8 +9,9 @@ import Foundation
 import AVFoundation
 
 @available(iOS 10.0, macOS 10.15, *)
+@available(tvOS, unavailable)
 public class Camera: NSObject {
-    
+    #if !os(tvOS)
     public enum Error: Swift.Error {
         case noDeviceFound
         case cannotAddInput
@@ -382,5 +383,6 @@ public class Camera: NSObject {
     
     @available(macOS, unavailable)
     internal var audioQueueCaptureSession: AudioQueueCaptureSession?
+    #endif
 }
 

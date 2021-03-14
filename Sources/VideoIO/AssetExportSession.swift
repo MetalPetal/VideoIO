@@ -8,6 +8,7 @@
 import Foundation
 import AVFoundation
 
+@available(tvOS 10.0, *)
 public class AssetExportSession {
     
     public struct Configuration {
@@ -108,7 +109,7 @@ public class AssetExportSession {
                 videoOutput = videoCompositionOutput
                 inputTransform = nil
             } else {
-                if #available(iOS 13.0, macOS 10.15, *) {
+                if #available(iOS 13.0, tvOS 13.0, macOS 10.15, *) {
                     if videoTracks.first!.hasMediaCharacteristic(.containsAlphaChannel) {
                         videoOutput = AVAssetReaderTrackOutput(track: videoTracks.first!, outputSettings: [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA])
                     } else {
@@ -425,6 +426,7 @@ public class AssetExportSession {
     }
 }
 
+@available(tvOS 10.0, *)
 extension AssetExportSession {
     public static func fileType(for url: URL) -> AVFileType? {
         switch url.pathExtension.lowercased() {

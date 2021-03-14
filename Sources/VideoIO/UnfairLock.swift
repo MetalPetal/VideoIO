@@ -8,6 +8,7 @@
 import Foundation
 
 /// An `os_unfair_lock` wrapper.
+@available(tvOS 10.0, *)
 final class UnfairLock {
     private let unfairLock: os_unfair_lock_t
     
