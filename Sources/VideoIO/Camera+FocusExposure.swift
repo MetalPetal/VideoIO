@@ -9,8 +9,9 @@ import Foundation
 import AVFoundation
 
 @available(iOS 10.0, macOS 10.15, *)
+@available(tvOS, unavailable)
 extension Camera {
-    
+    #if !os(tvOS)
     @available(macOS, unavailable)
     public func setFocusExposurePointOfInterest(to devicePoint: CGPoint, focusMode: AVCaptureDevice.FocusMode = .continuousAutoFocus, exposureMode: AVCaptureDevice.ExposureMode = .continuousAutoExposure, shouldMonitorSubjectAreaChange: Bool = false) throws {
         guard let videoDevice = self.videoDevice else {
@@ -157,4 +158,5 @@ extension Camera {
         guard let output = self.videoDataOutput else { return CGPoint(x: 0.5, y: 0.5) }
         return output.metadataOutputRectConverted(fromOutputRect: CGRect(origin: point, size: .zero)).origin
     }
+    #endif
 }

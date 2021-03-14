@@ -8,7 +8,7 @@ extension CMSampleTimingInfo: Equatable {
     }
 }
 
-@available(iOS 10.0, macOS 10.13, *)
+@available(iOS 10.0, tvOS 10.0, macOS 10.13, *)
 final class VideoIOTests: XCTestCase {
     
     let testMovieURL = URL(fileURLWithPath: "\(#file)").deletingLastPathComponent().appendingPathComponent("ElephantsDream.mp4")
