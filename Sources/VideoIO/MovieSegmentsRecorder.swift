@@ -21,7 +21,6 @@ public struct MovieSegment {
     
 }
 
-@available(tvOS 10.0, *)
 public protocol MovieSegmentsRecorderDelegate: class {
     
     // for current segment
@@ -58,7 +57,6 @@ public enum MovieSegmentsRecorderError: LocalizedError {
     }
 }
 
-@available(tvOS 10.0, *)
 public final class MovieSegmentsRecorder {
     
     /// internal state machine
@@ -365,7 +363,6 @@ public final class MovieSegmentsRecorder {
     
 }
 
-@available(tvOS 10.0, *)
 extension MovieSegmentsRecorder: MovieRecorderDelegate {
     
     public func movieRecorderDidFinishPreparing(_ recorder: MovieRecorder) {

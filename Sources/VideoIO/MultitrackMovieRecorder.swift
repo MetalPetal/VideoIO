@@ -1,7 +1,7 @@
 import AVFoundation
 import CoreImage
 
-@available(iOS 11.0, tvOS 10.0, macOS 10.14, *)
+@available(iOS 11.0, macOS 10.14, *)
 public final class MultitrackMovieRecorder {
     
     public enum RecorderError: LocalizedError {

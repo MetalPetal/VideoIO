@@ -8,7 +8,6 @@
 import Foundation
 import AVFoundation
 
-@available(tvOS 10.0, *)
 public class AssetExportSession {
     
     public struct Configuration {
@@ -426,7 +425,6 @@ public class AssetExportSession {
     }
 }
 
-@available(tvOS 10.0, *)
 extension AssetExportSession {
     public static func fileType(for url: URL) -> AVFileType? {
         switch url.pathExtension.lowercased() {

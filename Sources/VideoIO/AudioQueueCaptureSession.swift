@@ -8,13 +8,11 @@
 import Foundation
 import AVFoundation
 
-@available(tvOS 10.0, *)
 @available(macOS, unavailable)
 public protocol AudioQueueCaptureSessionDelegate: class {
     func audioQueueCaptureSession(_ session: AudioQueueCaptureSession, didOutputSampleBuffer sampleBuffer: CMSampleBuffer)
 }
 
-@available(tvOS 10.0, *)
 @available(macOS, unavailable)
 public class AudioQueueCaptureSession {
     

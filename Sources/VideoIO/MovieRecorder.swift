@@ -9,7 +9,6 @@ import Foundation
 import AVFoundation
 import CoreImage
 
-@available(tvOS 10.0, *)
 public protocol MovieRecorderDelegate: class {
     
     func movieRecorderDidFinishPreparing(_ recorder: MovieRecorder)
@@ -35,7 +34,6 @@ public enum MovieRecorderError: LocalizedError {
     }
 }
 
-@available(tvOS 10.0, *)
 public final class MovieRecorder {
     
     public struct Configuration {
