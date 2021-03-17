@@ -10,8 +10,7 @@ import AVFoundation
 
 @available(iOS 10.0, macOS 10.15, *)
 @available(tvOS, unavailable)
-public class Camera: NSObject {
-    #if !os(tvOS)
+public class Camera {
     public enum Error: Swift.Error {
         case noDeviceFound
         case cannotAddInput
@@ -67,7 +66,6 @@ public class Camera: NSObject {
         self.captureSession = captureSession
         self.configurator = configurator
         self.defaultCameraPosition = defaultCameraPosition
-        super.init()
     }
     
     public var captureSessionIsRunning: Bool {
@@ -103,6 +101,8 @@ public class Camera: NSObject {
         if preferredDeviceTypes.count == 0 {
             #if os(macOS)
             deviceTypes = [.builtInWideAngleCamera]
+            #elseif os(tvOS)
+            deviceTypes = []
             #else
             if #available(iOS 13.0, *) {
                 deviceTypes = [.builtInDualWideCamera, .builtInDualCamera, .builtInTrueDepthCamera, .builtInWideAngleCamera]
@@ -240,7 +240,6 @@ public class Camera: NSObject {
     
     #if os(iOS)
     
-   
     public var metadataCaptureConnection: AVCaptureConnection? {
         return self.metadataOutput?.connection(with: .metadata)
     }
@@ -383,6 +382,5 @@ public class Camera: NSObject {
     
     @available(macOS, unavailable)
     internal var audioQueueCaptureSession: AudioQueueCaptureSession?
-    #endif
 }
 

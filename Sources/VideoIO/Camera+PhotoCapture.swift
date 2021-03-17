@@ -8,10 +8,10 @@
 import Foundation
 import AVFoundation
 
-@available(OSX 10.15, *)
+@available(macOS 10.15, *)
 @available(tvOS, unavailable)
 extension Camera {
-    #if !os(tvOS)
+    
     @available(iOS 11.0, *)
     private class PhotoCaptureDelegateHandler: NSObject, AVCapturePhotoCaptureDelegate {
         var willBeginCaptureHandler: ((AVCaptureResolvedPhotoSettings) -> Void)?
@@ -49,5 +49,4 @@ extension Camera {
         assert(self.photoOutput != nil)
         self.photoOutput?.capturePhoto(with: settings, delegate: delegate)
     }
-    #endif
 }
