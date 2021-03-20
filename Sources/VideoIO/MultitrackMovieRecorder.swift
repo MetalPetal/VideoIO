@@ -1,10 +1,10 @@
 import AVFoundation
 import CoreImage
 
-@available(iOS 11.0, macOS 10.14, *)
 public final class MultitrackMovieRecorder {
     
     public enum RecorderError: LocalizedError {
+        case unsupportedFileType
         case cannotSetupVideoInputs
         case cannotSetupAudioInputs
         case unexpectedAssetWriterStatus
@@ -20,6 +20,8 @@ public final class MultitrackMovieRecorder {
                 return "Unexpected asset writer status."
             case .alreadyStopped:
                 return "Already stopped."
+            case .unsupportedFileType:
+                return "Unsupported file type."
             }
         }
     }
@@ -119,13 +121,15 @@ public final class MultitrackMovieRecorder {
         guard configuration.numberOfVideoTracks > 0 && configuration.numberOfAudioTracks >= 0 else {
             throw ConfigurationError.notSupported
         }
-        
+        guard let fileType = MovieFileType.from(url: url)?.avFileType else {
+            throw RecorderError.unsupportedFileType
+        }
         self.url = url
         self.configuration = configuration
         
         let fileManager = FileManager()
         try? fileManager.removeItem(at: url)
-        self.assetWriter = try AVAssetWriter(url: url, fileType: .mp4)
+        self.assetWriter = try AVAssetWriter(url: url, fileType: fileType)
         self.assetWriter.metadata = self.configuration.metadata
         self.assetWriter.shouldOptimizeForNetworkUse = true
     }
@@ -424,5 +428,92 @@ public final class MultitrackMovieRecorder {
     private func transitionToFailedStatus(error: Error) {
         dispatchPrecondition(condition: .onQueue(self.queue))
         self.error = error
+    }
+}
+
+public final class MovieRecorder {
+    
+    private let internalRecorder: MultitrackMovieRecorder
+    
+    public var url: URL { internalRecorder.url }
+    
+    public var duration: CMTime { internalRecorder.duration }
+    
+    public var sampleWritingSessionStartTime: CMTime? { internalRecorder.sampleWritingSessionStartTime }
+    
+    public var sampleWritingSessionStartedHandler: ((_ sampleWritingSessionStartTime: CMTime) -> Void)? {
+        get {
+            internalRecorder.sampleWritingSessionStartedHandler
+        }
+        set {
+            internalRecorder.sampleWritingSessionStartedHandler = newValue
+        }
+    }
+    
+    public var durationChangedHandler: ((_ duration: CMTime) -> Void)? {
+        get {
+            internalRecorder.durationChangedHandler
+        }
+        set {
+            internalRecorder.durationChangedHandler = newValue
+        }
+    }
+    
+    public struct Configuration {
+        public var metadata: [AVMetadataItem] = []
+        
+        /// Exif Orientation
+        public var videoOrientation: Int32 = 0
+        
+        // You can use VideoSettings/AudioSettings API to create these dictionary.
+        public var videoSettings: [String: Any] = [:]
+        
+        // Audio sample rate and channel layout will be override by the recorder.
+        public var audioSettings: [String: Any] = [:]
+        
+        /// Set to `true` to record both video and audio.
+        public var hasAudio: Bool
+        
+        public init(hasAudio: Bool) {
+            self.hasAudio = hasAudio
+        }
+    }
+    
+    public let configuration: Configuration
+    
+    public init(url: URL, configuration: Configuration) throws {
+        self.configuration = configuration
+        var internalConfiguration = MultitrackMovieRecorder.Configuration(videoTrackCount: 1, audioTrackCount: configuration.hasAudio ? 1 : 0)
+        internalConfiguration.metadata = configuration.metadata
+        internalConfiguration.videoOrientation = configuration.videoOrientation
+        internalConfiguration.videoSettings = configuration.videoSettings
+        internalConfiguration.audioSettings = configuration.audioSettings
+        self.internalRecorder = try MultitrackMovieRecorder(url: url, configuration: internalConfiguration)
+    }
+    
+    public func appendSampleBuffer(_ sampleBuffer: CMSampleBuffer) throws {
+        guard let formatDescriptor = CMSampleBufferGetFormatDescription(sampleBuffer) else {
+            throw MultitrackMovieRecorder.BufferAppendingError.invalidMediaType
+        }
+        let type = CMFormatDescriptionGetMediaType(formatDescriptor)
+        if type == kCMMediaType_Video {
+            try self.internalRecorder.appendVideoSampleBuffers([sampleBuffer])
+        } else if type == kCMMediaType_Audio {
+            if self.configuration.hasAudio {
+                try self.internalRecorder.appendAudioSampleBuffers([sampleBuffer])
+            }
+        } else {
+            throw MultitrackMovieRecorder.BufferAppendingError.invalidMediaType
+        }
+    }
+    
+    public func cancelRecording(completion: @escaping () -> Void) {
+        internalRecorder.cancelRecording(completion: completion)
+    }
+    
+    public var isStopped: Bool { internalRecorder.isStopped }
+    
+    public func stopRecording(completion: @escaping (Error?) -> Void) {
+        internalRecorder.stopRecording(completion: completion)
     }
 }
