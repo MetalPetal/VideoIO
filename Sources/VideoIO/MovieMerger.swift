@@ -8,16 +8,16 @@
 import Foundation
 import AVFoundation
 
-public final class MovieSegmentsMerger {
+public final class AssetMerger {
     
     public enum Error: LocalizedError {
-        case noSegments
+        case noAssets
         case cannotCreateExportSession
         case unsupportedFileType
         public var errorDescription: String? {
             switch self {
-            case .noSegments:
-                return "No segments to merge."
+            case .noAssets:
+                return "No assets to merge."
             case .cannotCreateExportSession:
                 return "Cannot create export session."
             case .unsupportedFileType:
@@ -26,9 +26,9 @@ public final class MovieSegmentsMerger {
         }
     }
     
-    public static func merge(_ segments: [URL], to url: URL, completion: @escaping (Swift.Error?) -> Void) {
-        if segments.isEmpty {
-            completion(Error.noSegments)
+    public static func merge(_ assets: [URL], to url: URL, completion: @escaping (Swift.Error?) -> Void) {
+        if assets.isEmpty {
+            completion(Error.noAssets)
             return
         }
         let composition = AVMutableComposition()
@@ -36,7 +36,7 @@ public final class MovieSegmentsMerger {
         var firstSegmentTransform: CGAffineTransform = .identity
         
         var isFirstSegmentTransformSet = false
-        for segment in segments {
+        for segment in assets {
             let asset = AVURLAsset(url: segment, options: [AVURLAssetPreferPreciseDurationAndTimingKey: true])
             if !isFirstSegmentTransformSet, let videoTrack = asset.tracks(withMediaType: .video).first {
                 firstSegmentTransform = videoTrack.preferredTransform
