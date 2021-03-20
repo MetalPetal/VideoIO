@@ -8,7 +8,7 @@
 import Foundation
 import AVFoundation
 
-public final class AssetMerger {
+public final class MovieMerger {
     
     public enum Error: LocalizedError {
         case noAssets
