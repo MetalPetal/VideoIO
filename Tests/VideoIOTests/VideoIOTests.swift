@@ -61,6 +61,36 @@ final class VideoIOTests: XCTestCase {
         try? fileManager.removeItem(at: tempURL)
     }
     
+    func testVideoExport_videoComposition() throws {
+        let fileManager = FileManager()
+        let tempURL = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString).appendingPathExtension("mp4")
+        let movieAsset = AVURLAsset(url: testMovieURL, options: [AVURLAssetPreferPreciseDurationAndTimingKey: true])
+        let composition = AVMutableComposition()
+        let videoTrack = try XCTUnwrap(composition.addMutableTrack(withMediaType: .video, preferredTrackID: composition.unusedTrackID()))
+        let originalVideoTrack = try XCTUnwrap(movieAsset.tracks(withMediaType: .video).first)
+        try videoTrack.insertTimeRange(originalVideoTrack.timeRange, of: originalVideoTrack, at: .zero)
+        let originalAudioTrack = try XCTUnwrap(movieAsset.tracks(withMediaType:.audio).first)
+        let audioTrack = try XCTUnwrap(composition.addMutableTrack(withMediaType: .audio, preferredTrackID: composition.unusedTrackID()))
+        try audioTrack.insertTimeRange(originalAudioTrack.timeRange, of: originalAudioTrack, at: .zero)
+        
+        let expectation = XCTestExpectation()
+        let exporter = try! AssetExportSession(asset: composition, outputURL: tempURL, configuration: AssetExportSession.Configuration(fileType: AssetExportSession.fileType(for: tempURL)!, videoSettings: .h264(videoSize: composition.presentationVideoSize!), audioSettings: .aac(channels: 2, sampleRate: 44100, bitRate: 96 * 1024)))
+        var overallProgress: Double = 0
+        var videoProgress: Double = 0
+        exporter.export(progress: { progress in
+            videoProgress = progress.videoEncodingProgress!.fractionCompleted
+            overallProgress = progress.fractionCompleted
+        }) { error in
+            XCTAssert(error == nil)
+            XCTAssert(try! tempURL.resourceValues(forKeys: Set<URLResourceKey>([.fileSizeKey])).fileSize! > 0)
+            XCTAssert(overallProgress == 1)
+            XCTAssert(videoProgress == 1)
+            expectation.fulfill()
+        }
+        wait(for: [expectation], timeout: 10.0)
+        try? fileManager.removeItem(at: tempURL)
+    }
+    
     func testVideoExportCancel() {
         let fileManager = FileManager()
         let tempURL = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString).appendingPathExtension("mp4")
