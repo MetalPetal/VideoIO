@@ -39,12 +39,12 @@ final class VideoIOTests: XCTestCase {
                                                                    AVVideoCompressionPropertiesKey: [AVVideoAverageBitRateKey: 3000000, AVVideoProfileLevelKey: AVVideoProfileLevelH264HighAutoLevel]] as NSDictionary)
     }
     
-    func testVideoExport() {
+    func testVideoExport() throws {
         let fileManager = FileManager()
         let tempURL = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString).appendingPathExtension("mp4")
         let asset = AVURLAsset(url: testMovieURL)
         let expectation = XCTestExpectation()
-        let exporter = try! AssetExportSession(asset: asset, outputURL: tempURL, configuration: AssetExportSession.Configuration(fileType: AssetExportSession.fileType(for: tempURL)!, videoSettings: .h264(videoSize: asset.presentationVideoSize!), audioSettings: .aac(channels: 2, sampleRate: 44100, bitRate: 96 * 1024)))
+        let exporter = try AssetExportSession(asset: asset, outputURL: tempURL, configuration: AssetExportSession.Configuration(fileType: AssetExportSession.fileType(for: tempURL)!, videoSettings: .h264(videoSize: asset.presentationVideoSize!), audioSettings: .aac(channels: 2, sampleRate: 44100, bitRate: 96 * 1024)))
         var overallProgress: Double = 0
         var videoProgress: Double = 0
         exporter.export(progress: { progress in
@@ -74,7 +74,7 @@ final class VideoIOTests: XCTestCase {
         try audioTrack.insertTimeRange(originalAudioTrack.timeRange, of: originalAudioTrack, at: .zero)
         
         let expectation = XCTestExpectation()
-        let exporter = try! AssetExportSession(asset: composition, outputURL: tempURL, configuration: AssetExportSession.Configuration(fileType: AssetExportSession.fileType(for: tempURL)!, videoSettings: .h264(videoSize: composition.presentationVideoSize!), audioSettings: .aac(channels: 2, sampleRate: 44100, bitRate: 96 * 1024)))
+        let exporter = try AssetExportSession(asset: composition, outputURL: tempURL, configuration: AssetExportSession.Configuration(fileType: AssetExportSession.fileType(for: tempURL)!, videoSettings: .h264(videoSize: composition.presentationVideoSize!), audioSettings: .aac(channels: 2, sampleRate: 44100, bitRate: 96 * 1024)))
         var overallProgress: Double = 0
         var videoProgress: Double = 0
         exporter.export(progress: { progress in
@@ -91,12 +91,12 @@ final class VideoIOTests: XCTestCase {
         try? fileManager.removeItem(at: tempURL)
     }
     
-    func testVideoExportCancel() {
+    func testVideoExportCancel() throws {
         let fileManager = FileManager()
         let tempURL = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString).appendingPathExtension("mp4")
         let asset = AVURLAsset(url: testMovieURL)
         let expectation = XCTestExpectation()
-        let exporter = try! AssetExportSession(asset: asset, outputURL: tempURL, configuration: AssetExportSession.Configuration(fileType: AssetExportSession.fileType(for: tempURL)!, videoSettings: .h264(videoSize: asset.presentationVideoSize!), audioSettings: .aac(channels: 2, sampleRate: 44100, bitRate: 96 * 1024)))
+        let exporter = try AssetExportSession(asset: asset, outputURL: tempURL, configuration: AssetExportSession.Configuration(fileType: AssetExportSession.fileType(for: tempURL)!, videoSettings: .h264(videoSize: asset.presentationVideoSize!), audioSettings: .aac(channels: 2, sampleRate: 44100, bitRate: 96 * 1024)))
         exporter.export(progress: nil) { error in
             XCTAssert((error as? AssetExportSession.Error) == .cancelled)
             expectation.fulfill()
@@ -106,12 +106,12 @@ final class VideoIOTests: XCTestCase {
         try? fileManager.removeItem(at: tempURL)
     }
     
-    func testVideoExportCancel_delay() {
+    func testVideoExportCancel_delay() throws {
         let fileManager = FileManager()
         let tempURL = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString).appendingPathExtension("mp4")
         let asset = AVURLAsset(url: testMovieURL)
         let expectation = XCTestExpectation()
-        let exporter = try! AssetExportSession(asset: asset, outputURL: tempURL, configuration: AssetExportSession.Configuration(fileType: AssetExportSession.fileType(for: tempURL)!, videoSettings: .h264(videoSize: asset.presentationVideoSize!), audioSettings: .aac(channels: 2, sampleRate: 44100, bitRate: 96 * 1024)))
+        let exporter = try AssetExportSession(asset: asset, outputURL: tempURL, configuration: AssetExportSession.Configuration(fileType: AssetExportSession.fileType(for: tempURL)!, videoSettings: .h264(videoSize: asset.presentationVideoSize!), audioSettings: .aac(channels: 2, sampleRate: 44100, bitRate: 96 * 1024)))
         var overallProgress: Double = 0
         exporter.export(progress: { progress in
             overallProgress = progress.fractionCompleted
@@ -127,12 +127,12 @@ final class VideoIOTests: XCTestCase {
         try? fileManager.removeItem(at: tempURL)
     }
     
-    func testVideoExportCancel_lifecycle() {
+    func testVideoExportCancel_lifecycle() throws {
         let fileManager = FileManager()
         let tempURL = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString).appendingPathExtension("mp4")
         let asset = AVURLAsset(url: testMovieURL)
         let expectation = XCTestExpectation()
-        var exporter: AssetExportSession? = try! AssetExportSession(asset: asset, outputURL: tempURL, configuration: AssetExportSession.Configuration(fileType: AssetExportSession.fileType(for: tempURL)!, videoSettings: .h264(videoSize: asset.presentationVideoSize!), audioSettings: .aac(channels: 2, sampleRate: 44100, bitRate: 96 * 1024)))
+        var exporter: AssetExportSession? = try AssetExportSession(asset: asset, outputURL: tempURL, configuration: AssetExportSession.Configuration(fileType: AssetExportSession.fileType(for: tempURL)!, videoSettings: .h264(videoSize: asset.presentationVideoSize!), audioSettings: .aac(channels: 2, sampleRate: 44100, bitRate: 96 * 1024)))
         weak var weakExporter = exporter
         var overallProgress: Double = 0
         exporter?.export(progress: { progress in
@@ -154,12 +154,12 @@ final class VideoIOTests: XCTestCase {
         XCTAssert(weakExporter == nil)
     }
     
-    func testVideoExportCancel_pauseThenCancel() {
+    func testVideoExportCancel_pauseThenCancel() throws {
         let fileManager = FileManager()
         let tempURL = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString).appendingPathExtension("mp4")
         let asset = AVURLAsset(url: testMovieURL)
         let expectation = XCTestExpectation()
-        var exporter: AssetExportSession? = try! AssetExportSession(asset: asset, outputURL: tempURL, configuration: AssetExportSession.Configuration(fileType: AssetExportSession.fileType(for: tempURL)!, videoSettings: .h264(videoSize: asset.presentationVideoSize!), audioSettings: .aac(channels: 2, sampleRate: 44100, bitRate: 96 * 1024)))
+        var exporter: AssetExportSession? = try AssetExportSession(asset: asset, outputURL: tempURL, configuration: AssetExportSession.Configuration(fileType: AssetExportSession.fileType(for: tempURL)!, videoSettings: .h264(videoSize: asset.presentationVideoSize!), audioSettings: .aac(channels: 2, sampleRate: 44100, bitRate: 96 * 1024)))
         weak var weakExporter = exporter
         var overallProgress: Double = 0
         exporter?.export(progress: { progress in
