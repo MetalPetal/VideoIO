@@ -85,7 +85,7 @@ public class AssetExportSession {
         self.configuration = configuration
         self.outputURL = outputURL
         
-        self.reader = try AVAssetReader(asset: asset)
+        self.reader = try AVAssetReader(asset: self.asset)
         self.writer = try AVAssetWriter(outputURL: outputURL, fileType: configuration.fileType)
         self.reader.timeRange = configuration.timeRange
         self.writer.shouldOptimizeForNetworkUse = configuration.shouldOptimizeForNetworkUse
@@ -94,10 +94,10 @@ public class AssetExportSession {
         if configuration.timeRange.duration.isValid && !configuration.timeRange.duration.isPositiveInfinity {
             self.duration = configuration.timeRange.duration
         } else {
-            self.duration = asset.duration
+            self.duration = self.asset.duration
         }
         
-        let videoTracks = asset.tracks(withMediaType: .video)
+        let videoTracks = self.asset.tracks(withMediaType: .video)
         if (videoTracks.count > 0) {
             let videoOutput: AVAssetReaderOutput
             let inputTransform: CGAffineTransform?
@@ -151,7 +151,7 @@ public class AssetExportSession {
             self.videoInput = nil
         }
         
-        let audioTracks = asset.tracks(withMediaType: .audio)
+        let audioTracks = self.asset.tracks(withMediaType: .audio)
         if audioTracks.count > 0 {
             let audioOutput = AVAssetReaderAudioMixOutput(audioTracks: audioTracks, audioSettings: nil)
             audioOutput.alwaysCopiesSampleData = false
