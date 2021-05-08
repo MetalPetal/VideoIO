@@ -151,7 +151,7 @@ public class AssetExportSession {
             self.videoInput = nil
         }
         
-        let audioTracks = self.asset.tracks(withMediaType: .audio)
+        let audioTracks = asset.tracks(withMediaType: .audio)
         if audioTracks.count > 0 {
             let audioOutput = AVAssetReaderAudioMixOutput(audioTracks: audioTracks, audioSettings: nil)
             audioOutput.alwaysCopiesSampleData = false
