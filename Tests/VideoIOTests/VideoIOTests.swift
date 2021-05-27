@@ -226,11 +226,4 @@ final class VideoIOTests: XCTestCase {
         wait(for: [expectation], timeout: 10)
         #endif
     }
-    
-    static var allTests = [
-        ("testAudioVideoSettings", testAudioVideoSettings),
-        ("testVideoExport", testVideoExport),
-        ("testSampleBufferUtilities", testSampleBufferUtilities),
-        ("testPlayerVideoOutput_iOS", testPlayerVideoOutput_iOS),
-    ]
 }
