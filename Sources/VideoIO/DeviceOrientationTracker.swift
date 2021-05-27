@@ -12,7 +12,7 @@ import CoreMotion
 import UIKit
 import AVFoundation
 
-public protocol DeviceOrientationTrackerDelegate: class {
+public protocol DeviceOrientationTrackerDelegate: AnyObject {
     func deviceOrientationUpdated(tracker: DeviceOrientationTracker, orientation: UIDeviceOrientation)
 }
 

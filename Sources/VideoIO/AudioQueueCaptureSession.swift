@@ -9,7 +9,7 @@ import Foundation
 import AVFoundation
 
 @available(macOS, unavailable)
-public protocol AudioQueueCaptureSessionDelegate: class {
+public protocol AudioQueueCaptureSessionDelegate: AnyObject {
     func audioQueueCaptureSession(_ session: AudioQueueCaptureSession, didOutputSampleBuffer sampleBuffer: CMSampleBuffer)
 }
 
