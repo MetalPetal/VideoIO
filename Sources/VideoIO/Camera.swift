@@ -290,6 +290,7 @@ public class Camera {
     
     private var _outputSynchronizer: Any?
     @available(iOS 11.0, *)
+    @available(macCatalyst 14.0, *)
     private var outputSynchronizer: AVCaptureDataOutputSynchronizer? {
         get {
             return _outputSynchronizer as? AVCaptureDataOutputSynchronizer
@@ -300,12 +301,14 @@ public class Camera {
     }
     
     @available(iOS 11.0, *)
+    @available(macCatalyst 14.0, *)
     public var depthCaptureConnection: AVCaptureConnection? {
         return self.depthDataOutput?.connection(with: .depthData)
     }
     
     private var _depthDataOutput: Any?
     @available(iOS 11.0, *)
+    @available(macCatalyst 14.0, *)
     public private(set) var depthDataOutput: AVCaptureDepthDataOutput? {
         get {
             return _depthDataOutput as? AVCaptureDepthDataOutput
@@ -316,6 +319,7 @@ public class Camera {
     }
     
     @available(iOS 11.0, *)
+    @available(macCatalyst 14.0, *)
     public func enableSynchronizedVideoAndDepthDataOutput(on queue: DispatchQueue, delegate: AVCaptureDataOutputSynchronizerDelegate) throws {
         assert(self.videoDataOutput == nil)
         assert(self.outputSynchronizer == nil)
@@ -357,6 +361,7 @@ public class Camera {
     }
     
     @available(iOS 11.0, *)
+    @available(macCatalyst 14.0, *)
     public func disableSynchronizedVideoAndDepthDataOutput() {
         self.captureSession.beginConfiguration()
         

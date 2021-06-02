@@ -12,6 +12,7 @@ import CoreMotion
 import UIKit
 import AVFoundation
 
+@available(macCatalyst 14.0, *)
 public protocol DeviceOrientationTrackerDelegate: AnyObject {
     func deviceOrientationUpdated(tracker: DeviceOrientationTracker, orientation: UIDeviceOrientation)
 }
