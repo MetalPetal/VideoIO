@@ -10,6 +10,7 @@ import AVFoundation
 
 @available(macOS 10.15, *)
 @available(tvOS, unavailable)
+@available(macCatalyst 14.0, *)
 extension Camera {
     
     @available(iOS 11.0, *)

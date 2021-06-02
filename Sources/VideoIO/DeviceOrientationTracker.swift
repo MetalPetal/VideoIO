@@ -17,6 +17,7 @@ public protocol DeviceOrientationTrackerDelegate: AnyObject {
 }
 
 @available(macOS, unavailable)
+@available(macCatalyst 14.0, *)
 public class DeviceOrientationTracker {
     
     private let motionManager = CMMotionManager()

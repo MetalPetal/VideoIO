@@ -10,6 +10,7 @@ import AVFoundation
 
 @available(iOS 10.0, macOS 10.15, *)
 @available(tvOS, unavailable)
+@available(macCatalyst 14.0, *)
 extension Camera {
     @available(macOS, unavailable)
     public func setFocusExposurePointOfInterest(to devicePoint: CGPoint, focusMode: AVCaptureDevice.FocusMode = .continuousAutoFocus, exposureMode: AVCaptureDevice.ExposureMode = .continuousAutoExposure, shouldMonitorSubjectAreaChange: Bool = false) throws {

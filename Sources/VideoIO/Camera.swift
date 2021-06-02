@@ -10,6 +10,7 @@ import AVFoundation
 
 @available(iOS 10.0, macOS 10.15, *)
 @available(tvOS, unavailable)
+@available(macCatalyst 14.0, *)
 public class Camera {
     public enum Error: Swift.Error {
         case noDeviceFound
