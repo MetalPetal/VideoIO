@@ -12,6 +12,7 @@ import CoreGraphics
 public struct VideoOrientationUtilities {
     
     @available(tvOS, unavailable)
+    @available(macCatalyst 14.0, *)
     public static func exifOrientationToApply(from captureOrientation: AVCaptureVideoOrientation, to targetOrientation: AVCaptureVideoOrientation, shouldMirror: Bool) -> CGImagePropertyOrientation {
         switch captureOrientation {
         case .landscapeLeft:

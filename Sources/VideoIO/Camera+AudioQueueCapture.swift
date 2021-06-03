@@ -10,6 +10,7 @@ import Foundation
 @available(iOS 10.0, macOS 10.15, *)
 @available(tvOS, unavailable)
 @available(macOS, unavailable)
+@available(macCatalyst 14.0, *)
 extension Camera {
     public func enableAudioQueueCaptureDataOutput(on queue: DispatchQueue = .main, delegate: AudioQueueCaptureSessionDelegate) throws {
         assert(self.audioDataOutput == nil)

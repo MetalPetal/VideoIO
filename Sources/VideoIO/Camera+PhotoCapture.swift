@@ -10,9 +10,11 @@ import AVFoundation
 
 @available(macOS 10.15, *)
 @available(tvOS, unavailable)
+@available(macCatalyst 14.0, *)
 extension Camera {
     
     @available(iOS 11.0, *)
+    @available(macCatalyst 14.0, *)
     private class PhotoCaptureDelegateHandler: NSObject, AVCapturePhotoCaptureDelegate {
         var willBeginCaptureHandler: ((AVCaptureResolvedPhotoSettings) -> Void)?
         var didFinishProcessingHandler: ((Result<AVCapturePhoto, Swift.Error>) -> Void)?
@@ -29,6 +31,7 @@ extension Camera {
     }
     
     @available(iOS 11.0, *)
+    @available(macCatalyst 14.0, *)
     public func capturePhoto(with settings: AVCapturePhotoSettings,
                              willBeginCaptureHandler: ((AVCaptureResolvedPhotoSettings) -> Void)? = nil,
                              didFinishProcessingHandler: @escaping (Result<AVCapturePhoto, Swift.Error>) -> Void) {
