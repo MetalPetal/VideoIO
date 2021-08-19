@@ -62,6 +62,8 @@ public class AudioQueueCaptureSession {
 
     public let sampleRate: Double
     
+    private let channelsPerFrame: UInt32?
+    
     private weak var delegate: AudioQueueCaptureSessionDelegate?
     private let delegateQueue: DispatchQueue
     
@@ -72,7 +74,8 @@ public class AudioQueueCaptureSession {
     
     private var clientInfo: ClientInfo?
     
-    public init(sampleRate: Double = 44100, delegate: AudioQueueCaptureSessionDelegate, delegateQueue: DispatchQueue = .main) {
+    public init(sampleRate: Double = 44100, channelsPerFrame: UInt32? = nil, delegate: AudioQueueCaptureSessionDelegate, delegateQueue: DispatchQueue = .main) {
+        self.channelsPerFrame = channelsPerFrame
         self.sampleRate = sampleRate
         self.delegate = delegate
         self.delegateQueue = delegateQueue
@@ -142,7 +145,7 @@ public class AudioQueueCaptureSession {
         if AVAudioSession.sharedInstance().isInputAvailable {
             var recordFormat = AudioStreamBasicDescription()
             recordFormat.mSampleRate = sampleRate
-            recordFormat.mChannelsPerFrame = UInt32(AVAudioSession.sharedInstance().inputNumberOfChannels)
+            recordFormat.mChannelsPerFrame = channelsPerFrame ?? UInt32(AVAudioSession.sharedInstance().inputNumberOfChannels)
             recordFormat.mFormatID = kAudioFormatLinearPCM
             recordFormat.mFormatFlags = kLinearPCMFormatFlagIsSignedInteger | kLinearPCMFormatFlagIsPacked
             recordFormat.mBitsPerChannel = 16
