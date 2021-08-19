@@ -269,6 +269,7 @@ public final class MultitrackMovieRecorder {
                         
                         if let currentASBD = CMAudioFormatDescriptionGetStreamBasicDescription(formatDescription) {
                             audioSettings[AVSampleRateKey] = currentASBD.pointee.mSampleRate
+                            audioSettings[AVNumberOfChannelsKey] = currentASBD.pointee.mChannelsPerFrame
                         }
                         
                         var aclSize: Int = 0
