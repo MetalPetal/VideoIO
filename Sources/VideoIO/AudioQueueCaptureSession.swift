@@ -165,7 +165,7 @@ public class AudioQueueCaptureSession {
             
             var audioQueue: AudioQueueRef!
             let status = AudioQueueNewInput(&recordFormat, { (info, inAudioQueue, bufferRef, startTime, inNumPackets, inPacketDesc) in
-                guard let clientInfo = info?.assumingMemoryBound(to: ClientInfo.self).pointee else { return }
+                guard let clientInfo = info?.bindMemory(to: ClientInfo.self, capacity: 1).pointee else { return }
                 guard let session = clientInfo.session else { return }
                 if inNumPackets > 0 {
                     let t = Double(startTime.pointee.mHostTime) * Double(clientInfo.timebaseInfo.numer) / Double(clientInfo.timebaseInfo.denom) / Double(NSEC_PER_SEC)
