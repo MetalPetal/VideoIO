@@ -50,8 +50,10 @@ public class Camera {
     private let configurator: Configurator
     
     private let defaultCameraPosition: AVCaptureDevice.Position
+
+    private let defaultPreferredDeviceTypes: [AVCaptureDevice.DeviceType]
     
-    public init(captureSessionPreset: AVCaptureSession.Preset, defaultCameraPosition: AVCaptureDevice.Position = .back, configurator: Configurator = Configurator()) {
+    public init(captureSessionPreset: AVCaptureSession.Preset, defaultCameraPosition: AVCaptureDevice.Position = .back, defaultPreferredDeviceTypes: [AVCaptureDevice.DeviceType] = [], configurator: Configurator = Configurator()) {
         let captureSession = AVCaptureSession()
         assert(captureSession.canSetSessionPreset(captureSessionPreset))
         captureSession.beginConfiguration()
@@ -67,6 +69,7 @@ public class Camera {
         self.captureSession = captureSession
         self.configurator = configurator
         self.defaultCameraPosition = defaultCameraPosition
+        self.defaultPreferredDeviceTypes = defaultPreferredDeviceTypes
     }
     
     public var captureSessionIsRunning: Bool {
@@ -100,21 +103,23 @@ public class Camera {
     public func switchToVideoCaptureDevice(with position: AVCaptureDevice.Position, preferredDeviceTypes: [AVCaptureDevice.DeviceType] = []) throws {
         let deviceTypes: [AVCaptureDevice.DeviceType]
         if preferredDeviceTypes.count == 0 {
-            #if os(macOS)
-            deviceTypes = [.builtInWideAngleCamera]
-            #elseif os(tvOS)
-            deviceTypes = []
-            #else
-            if #available(iOS 13.0, *) {
-                deviceTypes = [.builtInDualWideCamera, .builtInDualCamera, .builtInTrueDepthCamera, .builtInWideAngleCamera]
-            } else if #available(iOS 11.1, *) {
-                deviceTypes = [.builtInDualCamera, .builtInTrueDepthCamera, .builtInWideAngleCamera]
-            } else if #available(iOS 10.2, *) {
-                deviceTypes = [.builtInDualCamera, .builtInWideAngleCamera]
-            } else {
+            if defaultPreferredDeviceTypes.count == 0 {
+                #if os(macOS)
                 deviceTypes = [.builtInWideAngleCamera]
+                #elseif os(tvOS)
+                deviceTypes = []
+                #else
+                if #available(iOS 11.1, *) {
+                    deviceTypes = [.builtInDualCamera, .builtInTrueDepthCamera, .builtInWideAngleCamera]
+                } else if #available(iOS 10.2, *) {
+                    deviceTypes = [.builtInDualCamera, .builtInWideAngleCamera]
+                } else {
+                    deviceTypes = [.builtInWideAngleCamera]
+                }
+                #endif
+            } else {
+                deviceTypes = defaultPreferredDeviceTypes
             }
-            #endif
         } else {
             deviceTypes = preferredDeviceTypes
         }
