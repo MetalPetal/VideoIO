@@ -87,6 +87,8 @@ public final class MultitrackMovieRecorder {
         var sampleBuffers: [CMSampleBuffer]
         var presentationTimeStamp: CMTime
         var duration: CMTime
+        
+        var endTime: CMTime { presentationTimeStamp + duration }
     }
     
     private var pendingAudioSampleBuffers: [SampleBufferGroup] = []
@@ -240,6 +242,12 @@ public final class MultitrackMovieRecorder {
                             }
                         }
                     }
+                    do {
+                        try self.tryAppendingPendingAudioBuffers()
+                    } catch {
+                        self.transitionToFailedStatus(error: error)
+                        return
+                    }
                 } else {
                     print("Video inputs: not ready for media data, dropping sample buffer (t: \(presentationTime.seconds)).")
                 }
@@ -323,8 +331,8 @@ public final class MultitrackMovieRecorder {
             
             if self.assetWriter.status == .writing {
                 do {
-                    try self.tryToAppendPendingSampleBuffers()
-                    try self.tryToAppendAudioSampleBufferGroup(SampleBufferGroup(sampleBuffers: sampleBuffers, presentationTimeStamp: presentationTime, duration: duration))
+                    try self.tryAppendingPendingAudioBuffers()
+                    try self.tryAppendingAudioSampleBufferGroup(SampleBufferGroup(sampleBuffers: sampleBuffers, presentationTimeStamp: presentationTime, duration: duration))
                 } catch {
                     self.transitionToFailedStatus(error: error)
                     return
@@ -377,7 +385,7 @@ public final class MultitrackMovieRecorder {
             }
             
             do {
-                try self.tryToAppendPendingSampleBuffers()
+                try self.tryAppendingPendingAudioBuffers()
             } catch {
                 DispatchQueue.main.async {
                     completion(error)
@@ -409,36 +417,38 @@ public final class MultitrackMovieRecorder {
         }
     }
     
-    private func tryToAppendPendingSampleBuffers() throws {
+    private func tryAppendingPendingAudioBuffers() throws {
         dispatchPrecondition(condition: .onQueue(self.queue))
         guard self.pendingAudioSampleBuffers.count > 0 else {
             return
         }
-        let pendingAudioSampleBuffers = self.pendingAudioSampleBuffers
-        for sampleBufferGroup in pendingAudioSampleBuffers {
-            self.pendingAudioSampleBuffers.remove(at: 0)
-            try self.tryToAppendAudioSampleBufferGroup(sampleBufferGroup)
+        let (groupsToBeAppended, pendingGroups) = pendingAudioSampleBuffers.stableGroup(using: { $0.endTime >= lastVideoSampleTime })
+        for group in groupsToBeAppended {
+            try self.appendAudioSampleBufferGroup(group)
+        }
+        self.pendingAudioSampleBuffers = pendingGroups
+    }
+    
+    private func tryAppendingAudioSampleBufferGroup(_ group: SampleBufferGroup) throws {
+        dispatchPrecondition(condition: .onQueue(self.queue))
+        if group.endTime >= self.lastVideoSampleTime {
+            self.pendingAudioSampleBuffers.append(group)
+        } else {
+            try self.appendAudioSampleBufferGroup(group)
         }
     }
     
-    private func tryToAppendAudioSampleBufferGroup(_ group: SampleBufferGroup) throws {
-        dispatchPrecondition(condition: .onQueue(self.queue))
-        let duration = group.duration
-        let presentationTime = CMTimeAdd(group.presentationTimeStamp, duration)
-        if CMTimeCompare(presentationTime, self.lastVideoSampleTime) > 0 {
-            self.pendingAudioSampleBuffers.append(group)
-        } else {
-            if self.audioInputs.map(\.isReadyForMoreMediaData).reduce(true, { $0 && $1 }) {
-                for (index, audioInput) in self.audioInputs.enumerated() {
-                    if !audioInput.append(group.sampleBuffers[index]) {
-                        if let error = self.assetWriter.error {
-                            throw error
-                        }
+    private func appendAudioSampleBufferGroup(_ group: SampleBufferGroup) throws {
+        if self.audioInputs.map(\.isReadyForMoreMediaData).reduce(true, { $0 && $1 }) {
+            for (index, audioInput) in self.audioInputs.enumerated() {
+                if !audioInput.append(group.sampleBuffers[index]) {
+                    if let error = self.assetWriter.error {
+                        throw error
                     }
                 }
-            } else {
-                print("Audio inputs: not ready for media data, dropping sample buffer (t: \(presentationTime.seconds)).")
             }
+        } else {
+            print("Audio inputs: not ready for media data, dropping sample buffer (t: \(group.presentationTimeStamp)).")
         }
     }
     
@@ -448,6 +458,21 @@ public final class MultitrackMovieRecorder {
         self.errorLock.lock()
         self.error = error
         self.errorLock.unlock()
+    }
+}
+
+private extension Sequence {
+    func stableGroup(using predicate: (Element) throws -> Bool) rethrows -> ([Element], [Element]) {
+        var trueGroup: [Element] = []
+        var falseGroup: [Element] = []
+        for element in self {
+            if try predicate(element) {
+                trueGroup.append(element)
+            } else {
+                falseGroup.append(element)
+            }
+        }
+        return (trueGroup, falseGroup)
     }
 }
 
