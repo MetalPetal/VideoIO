@@ -117,6 +117,8 @@ public final class MultitrackMovieRecorder {
     private var error: Error?
     private var stopped: Bool = false
     
+    private let errorLock = UnfairLock()
+    
     public init(url: URL, configuration: Configuration) throws {
         guard configuration.numberOfVideoTracks > 0 && configuration.numberOfAudioTracks >= 0 else {
             throw ConfigurationError.notSupported
@@ -134,7 +136,17 @@ public final class MultitrackMovieRecorder {
         self.assetWriter.shouldOptimizeForNetworkUse = true
     }
     
+    private func checkError() throws {
+        errorLock.lock()
+        defer { errorLock.unlock() }
+        if let error = error {
+            throw error
+        }
+    }
+    
     public func appendVideoSampleBuffers(_ sampleBuffers: [CMSampleBuffer]) throws {
+        try checkError()
+        
         guard sampleBuffers.allSatisfy({ CMSampleBufferGetFormatDescription($0).map({ CMFormatDescriptionGetMediaType($0) }) == kCMMediaType_Video }) else {
             throw BufferAppendingError.invalidMediaType
         }
@@ -149,13 +161,14 @@ public final class MultitrackMovieRecorder {
         }
         let presentationTime = CMSampleBufferGetPresentationTimeStamp(sampleBuffers.first!)
         self.queue.async {
-            guard self.stopped == false else {
+            //no `errorLock` is required here because the `error` can only be assigned on `self.queue`
+            guard self.stopped == false, self.error == nil else {
                 return
             }
             
             if self.videoInputs.count == 0 {
-                var videoInputs: [AVAssetWriterInput] = []
                 do {
+                    var videoInputs: [AVAssetWriterInput] = []
                     for sampleBuffer in sampleBuffers {
                         guard let formatDescription = CMSampleBufferGetFormatDescription(sampleBuffer) else {
                             throw RecorderError.cannotSetupVideoInputs
@@ -182,11 +195,11 @@ public final class MultitrackMovieRecorder {
                             throw RecorderError.cannotSetupVideoInputs
                         }
                     }
+                    self.videoInputs = videoInputs
                 } catch {
                     self.transitionToFailedStatus(error: error)
                     return
                 }
-                self.videoInputs = videoInputs
             }
             
             guard self.videoInputs.count == self.configuration.numberOfVideoTracks && self.audioInputs.count == self.configuration.numberOfAudioTracks else {
@@ -230,12 +243,13 @@ public final class MultitrackMovieRecorder {
                 } else {
                     print("Video inputs: not ready for media data, dropping sample buffer (t: \(presentationTime.seconds)).")
                 }
-                
             }
         }
     }
     
     public func appendAudioSampleBuffers(_ sampleBuffers: [CMSampleBuffer]) throws {
+        try checkError()
+        
         guard sampleBuffers.allSatisfy({ CMSampleBufferGetFormatDescription($0).map({ CMFormatDescriptionGetMediaType($0) }) == kCMMediaType_Audio }) else {
             throw BufferAppendingError.invalidMediaType
         }
@@ -251,13 +265,14 @@ public final class MultitrackMovieRecorder {
         let presentationTime = CMSampleBufferGetPresentationTimeStamp(sampleBuffers.first!)
         let duration = CMSampleBufferGetDuration(sampleBuffers.first!)
         self.queue.async {
-            guard self.stopped == false else {
+            //no `errorLock` is required here because the `error` can only be assigned on `self.queue`
+            guard self.stopped == false, self.error == nil else {
                 return
             }
             
             if self.audioInputs.count == 0 {
-                var audioInputs: [AVAssetWriterInput] = []
                 do {
+                    var audioInputs: [AVAssetWriterInput] = []
                     for sampleBuffer in sampleBuffers {
                         guard let formatDescription = CMSampleBufferGetFormatDescription(sampleBuffer) else {
                             throw RecorderError.cannotSetupAudioInputs
@@ -295,11 +310,11 @@ public final class MultitrackMovieRecorder {
                             throw RecorderError.cannotSetupAudioInputs
                         }
                     }
+                    self.audioInputs = audioInputs
                 } catch {
                     self.transitionToFailedStatus(error: error)
                     return
                 }
-                self.audioInputs = audioInputs
             }
             
             guard self.videoInputs.count == self.configuration.numberOfVideoTracks && self.audioInputs.count == self.configuration.numberOfAudioTracks else {
@@ -312,6 +327,7 @@ public final class MultitrackMovieRecorder {
                     try self.tryToAppendAudioSampleBufferGroup(SampleBufferGroup(sampleBuffers: sampleBuffers, presentationTimeStamp: presentationTime, duration: duration))
                 } catch {
                     self.transitionToFailedStatus(error: error)
+                    return
                 }
             }
         }
@@ -428,7 +444,10 @@ public final class MultitrackMovieRecorder {
     
     private func transitionToFailedStatus(error: Error) {
         dispatchPrecondition(condition: .onQueue(self.queue))
+        assert(self.error == nil)
+        self.errorLock.lock()
         self.error = error
+        self.errorLock.unlock()
     }
 }
 
