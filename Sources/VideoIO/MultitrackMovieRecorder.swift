@@ -422,7 +422,7 @@ public final class MultitrackMovieRecorder {
         guard self.pendingAudioSampleBuffers.count > 0 else {
             return
         }
-        let (groupsToBeAppended, pendingGroups) = pendingAudioSampleBuffers.stableGroup(using: { $0.endTime >= lastVideoSampleTime })
+        let (groupsToBeAppended, pendingGroups) = pendingAudioSampleBuffers.stableGroup(using: { $0.endTime <= lastVideoSampleTime })
         for group in groupsToBeAppended {
             try self.appendAudioSampleBufferGroup(group)
         }
@@ -431,7 +431,7 @@ public final class MultitrackMovieRecorder {
     
     private func tryAppendingAudioSampleBufferGroup(_ group: SampleBufferGroup) throws {
         dispatchPrecondition(condition: .onQueue(self.queue))
-        if group.endTime >= self.lastVideoSampleTime {
+        if group.endTime > self.lastVideoSampleTime {
             self.pendingAudioSampleBuffers.append(group)
         } else {
             try self.appendAudioSampleBufferGroup(group)
