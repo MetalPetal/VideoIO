@@ -51,9 +51,9 @@ public class Camera {
     
     private let defaultCameraPosition: AVCaptureDevice.Position
 
-    private let defaultPreferredDeviceTypes: [AVCaptureDevice.DeviceType]
+    private let defaultCameraDeviceTypes: [AVCaptureDevice.DeviceType]
     
-    public init(captureSessionPreset: AVCaptureSession.Preset, defaultCameraPosition: AVCaptureDevice.Position = .back, defaultPreferredDeviceTypes: [AVCaptureDevice.DeviceType] = [], configurator: Configurator = Configurator()) {
+    public init(captureSessionPreset: AVCaptureSession.Preset, defaultCameraPosition: AVCaptureDevice.Position = .back, defaultCameraDeviceTypes: [AVCaptureDevice.DeviceType] = [], configurator: Configurator = Configurator()) {
         let captureSession = AVCaptureSession()
         assert(captureSession.canSetSessionPreset(captureSessionPreset))
         captureSession.beginConfiguration()
@@ -69,7 +69,7 @@ public class Camera {
         self.captureSession = captureSession
         self.configurator = configurator
         self.defaultCameraPosition = defaultCameraPosition
-        self.defaultPreferredDeviceTypes = defaultPreferredDeviceTypes
+        self.defaultCameraDeviceTypes = defaultCameraDeviceTypes
     }
     
     public var captureSessionIsRunning: Bool {
@@ -103,7 +103,7 @@ public class Camera {
     public func switchToVideoCaptureDevice(with position: AVCaptureDevice.Position, preferredDeviceTypes: [AVCaptureDevice.DeviceType] = []) throws {
         let deviceTypes: [AVCaptureDevice.DeviceType]
         if preferredDeviceTypes.count == 0 {
-            if defaultPreferredDeviceTypes.count == 0 {
+            if defaultCameraDeviceTypes.count == 0 {
                 #if os(macOS)
                 deviceTypes = [.builtInWideAngleCamera]
                 #elseif os(tvOS)
@@ -118,7 +118,7 @@ public class Camera {
                 }
                 #endif
             } else {
-                deviceTypes = defaultPreferredDeviceTypes
+                deviceTypes = defaultCameraDeviceTypes
             }
         } else {
             deviceTypes = preferredDeviceTypes
