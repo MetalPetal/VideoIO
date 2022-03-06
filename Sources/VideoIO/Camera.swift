@@ -1,6 +1,6 @@
 //
 //  File.swift
-//  
+//
 //
 //  Created by Yu Ao on 2019/12/18.
 //
@@ -103,7 +103,7 @@ public class Camera {
         return self.audioDeviceInput?.device
     }
     
-    public func switchToVideoCaptureDevice(with position: AVCaptureDevice.Position, preferredDeviceTypes: [AVCaptureDevice.DeviceType] = [], preferredCameraUniqueId: String? = nil) throws {
+    public func switchToVideoCaptureDevice(with position: AVCaptureDevice.Position, preferredDeviceTypes: [AVCaptureDevice.DeviceType] = [], preferredCameraUniqueId: String? = nil, preset: AVCaptureSession.Preset? = nil, lockConfiguration: Bool = false) throws {
         let deviceTypes: [AVCaptureDevice.DeviceType]
         if preferredDeviceTypes.count == 0 {
             if defaultCameraDeviceTypes.count == 0 {
@@ -139,6 +139,9 @@ public class Camera {
         
         let newVideoDeviceInput = try AVCaptureDeviceInput(device: device)
         self.captureSession.beginConfiguration()
+        if preset != nil {
+            self.captureSession.sessionPreset = .low
+        }
         if let currentVideoDeviceInput = self.videoDeviceInput {
             self.captureSession.removeInput(currentVideoDeviceInput)
         }
@@ -153,11 +156,20 @@ public class Camera {
         if let connection = self.videoCaptureConnection {
             self.configurator.videoConnectionConfigurator(self, connection)
         }
+        if let preset = preset, self.captureSession.canSetSessionPreset(preset) {
+            self.captureSession.sessionPreset = preset
+        }
         self.captureSession.commitConfiguration()
         
         try device.lockForConfiguration()
         self.configurator.videoDeviceConfigurator(self, device)
+        #if os(iOS)
         device.unlockForConfiguration()
+        #else
+        if !lockConfiguration {
+            device.unlockForConfiguration()
+        }
+        #endif
     }
     
     public var videoCaptureConnection: AVCaptureConnection? {
