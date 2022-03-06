@@ -49,11 +49,13 @@ public class Camera {
         
     private let configurator: Configurator
     
+    private let defaultCameraUniqueId: String?
+    
     private let defaultCameraPosition: AVCaptureDevice.Position
 
     private let defaultCameraDeviceTypes: [AVCaptureDevice.DeviceType]
     
-    public init(captureSessionPreset: AVCaptureSession.Preset, defaultCameraPosition: AVCaptureDevice.Position = .back, defaultCameraDeviceTypes: [AVCaptureDevice.DeviceType] = [], configurator: Configurator = Configurator()) {
+    public init(captureSessionPreset: AVCaptureSession.Preset, defaultCameraUniqueId: String? = nil, defaultCameraPosition: AVCaptureDevice.Position = .back, defaultCameraDeviceTypes: [AVCaptureDevice.DeviceType] = [], configurator: Configurator = Configurator()) {
         let captureSession = AVCaptureSession()
         assert(captureSession.canSetSessionPreset(captureSessionPreset))
         captureSession.beginConfiguration()
@@ -68,6 +70,7 @@ public class Camera {
         captureSession.commitConfiguration()
         self.captureSession = captureSession
         self.configurator = configurator
+        self.defaultCameraUniqueId = defaultCameraUniqueId
         self.defaultCameraPosition = defaultCameraPosition
         self.defaultCameraDeviceTypes = defaultCameraDeviceTypes
     }
@@ -100,7 +103,7 @@ public class Camera {
         return self.audioDeviceInput?.device
     }
     
-    public func switchToVideoCaptureDevice(with position: AVCaptureDevice.Position, preferredDeviceTypes: [AVCaptureDevice.DeviceType] = []) throws {
+    public func switchToVideoCaptureDevice(with position: AVCaptureDevice.Position, preferredDeviceTypes: [AVCaptureDevice.DeviceType] = [], preferredCameraUniqueId: String? = nil) throws {
         let deviceTypes: [AVCaptureDevice.DeviceType]
         if preferredDeviceTypes.count == 0 {
             if defaultCameraDeviceTypes.count == 0 {
@@ -124,31 +127,37 @@ public class Camera {
             deviceTypes = preferredDeviceTypes
         }
         let discoverySession = AVCaptureDevice.DiscoverySession(deviceTypes: deviceTypes, mediaType: .video, position: position)
-        if let device = discoverySession.devices.first {
-            let newVideoDeviceInput = try AVCaptureDeviceInput(device: device)
-            self.captureSession.beginConfiguration()
-            if let currentVideoDeviceInput = self.videoDeviceInput {
-                self.captureSession.removeInput(currentVideoDeviceInput)
-            }
-            if self.captureSession.canAddInput(newVideoDeviceInput) {
-                self.captureSession.addInput(newVideoDeviceInput)
-                self.videoDeviceInput = newVideoDeviceInput
-            } else {
-                self.captureSession.commitConfiguration()
-                throw Error.cannotAddInput
-            }
-                        
-            if let connection = self.videoCaptureConnection {
-                self.configurator.videoConnectionConfigurator(self, connection)
-            }
-            self.captureSession.commitConfiguration()
-            
-            try device.lockForConfiguration()
-            self.configurator.videoDeviceConfigurator(self, device)
-            device.unlockForConfiguration()
+
+        let device: AVCaptureDevice
+        if let preferredCamera = discoverySession.devices.first(where: { $0.uniqueID == preferredCameraUniqueId }) {
+            device = preferredCamera
+        } else if let discoveredDevice = discoverySession.devices.first {
+            device = discoveredDevice
         } else {
             throw Error.noDeviceFound
         }
+        
+        let newVideoDeviceInput = try AVCaptureDeviceInput(device: device)
+        self.captureSession.beginConfiguration()
+        if let currentVideoDeviceInput = self.videoDeviceInput {
+            self.captureSession.removeInput(currentVideoDeviceInput)
+        }
+        if self.captureSession.canAddInput(newVideoDeviceInput) {
+            self.captureSession.addInput(newVideoDeviceInput)
+            self.videoDeviceInput = newVideoDeviceInput
+        } else {
+            self.captureSession.commitConfiguration()
+            throw Error.cannotAddInput
+        }
+                    
+        if let connection = self.videoCaptureConnection {
+            self.configurator.videoConnectionConfigurator(self, connection)
+        }
+        self.captureSession.commitConfiguration()
+        
+        try device.lockForConfiguration()
+        self.configurator.videoDeviceConfigurator(self, device)
+        device.unlockForConfiguration()
     }
     
     public var videoCaptureConnection: AVCaptureConnection? {
@@ -160,7 +169,7 @@ public class Camera {
     public func enableVideoDataOutput(on queue: DispatchQueue = .main, delegate: AVCaptureVideoDataOutputSampleBufferDelegate) throws {
         assert(self.videoDataOutput == nil)
         if self.videoDevice == nil {
-            try self.switchToVideoCaptureDevice(with: self.defaultCameraPosition)
+            try self.switchToVideoCaptureDevice(with: self.defaultCameraPosition, preferredCameraUniqueId: self.defaultCameraUniqueId)
         }
         self.captureSession.beginConfiguration()
         defer {
