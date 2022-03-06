@@ -47,7 +47,7 @@ public class Camera {
     
     public let photoOutput: AVCapturePhotoOutput?
         
-    private let configurator: Configurator
+    private var configurator: Configurator
     
     private let defaultCameraUniqueId: String?
     
@@ -103,7 +103,10 @@ public class Camera {
         return self.audioDeviceInput?.device
     }
     
-    public func switchToVideoCaptureDevice(with position: AVCaptureDevice.Position, preferredDeviceTypes: [AVCaptureDevice.DeviceType] = [], preferredCameraUniqueId: String? = nil, preset: AVCaptureSession.Preset? = nil, lockConfiguration: Bool = false) throws {
+    public func switchToVideoCaptureDevice(with position: AVCaptureDevice.Position, preferredDeviceTypes: [AVCaptureDevice.DeviceType] = [], preferredCameraUniqueId: String? = nil, preset: AVCaptureSession.Preset? = nil, lockConfiguration: Bool = false, configurator: Configurator? = nil) throws {
+        if let configurator = configurator {
+            self.configurator = configurator
+        }
         let deviceTypes: [AVCaptureDevice.DeviceType]
         if preferredDeviceTypes.count == 0 {
             if defaultCameraDeviceTypes.count == 0 {
