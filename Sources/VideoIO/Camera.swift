@@ -55,7 +55,11 @@ public class Camera {
 
     private let defaultCameraDeviceTypes: [AVCaptureDevice.DeviceType]
     
-    public init(captureSessionPreset: AVCaptureSession.Preset, defaultCameraUniqueId: String? = nil, defaultCameraPosition: AVCaptureDevice.Position = .back, defaultCameraDeviceTypes: [AVCaptureDevice.DeviceType] = [], configurator: Configurator = Configurator()) {
+    private let defaultAudioDeviceUniqueId: String?
+    
+    private let defaultAudioDeviceTypes: [AVCaptureDevice.DeviceType]
+    
+    public init(captureSessionPreset: AVCaptureSession.Preset, defaultCameraUniqueId: String? = nil, defaultCameraPosition: AVCaptureDevice.Position = .back, defaultCameraDeviceTypes: [AVCaptureDevice.DeviceType] = [], defaultAudioDeviceUniqueId: String? = nil, defaultAudioDeviceTypes: [AVCaptureDevice.DeviceType] = [], configurator: Configurator = Configurator()) {
         let captureSession = AVCaptureSession()
         assert(captureSession.canSetSessionPreset(captureSessionPreset))
         captureSession.beginConfiguration()
@@ -73,6 +77,8 @@ public class Camera {
         self.defaultCameraUniqueId = defaultCameraUniqueId
         self.defaultCameraPosition = defaultCameraPosition
         self.defaultCameraDeviceTypes = defaultCameraDeviceTypes
+        self.defaultAudioDeviceUniqueId = defaultAudioDeviceUniqueId
+        self.defaultAudioDeviceTypes = defaultAudioDeviceTypes
     }
     
     public var captureSessionIsRunning: Bool {
@@ -202,6 +208,51 @@ public class Camera {
         self.captureSession.commitConfiguration()
     }
     
+    public func switchToAudioCaptureDevice(preferredDeviceTypes: [AVCaptureDevice.DeviceType] = [], preferredAudioDeviceId: String? = nil) throws {
+        let deviceTypes: [AVCaptureDevice.DeviceType]
+        if preferredDeviceTypes.count == 0 {
+            if defaultAudioDeviceTypes.count == 0 {
+                #if os(macOS)
+                deviceTypes = [.builtInMicrophone, .externalUnknown]
+                #elseif os(tvOS)
+                deviceTypes = []
+                #else
+                deviceTypes = [.builtInMicrophone]
+                #endif
+            } else {
+                deviceTypes = defaultAudioDeviceTypes
+            }
+        } else {
+            deviceTypes = preferredDeviceTypes
+        }
+        let discoverySession = AVCaptureDevice.DiscoverySession(deviceTypes: deviceTypes, mediaType: .audio, position: .unspecified)
+
+        let device: AVCaptureDevice
+        if let preferredAudioDevice = discoverySession.devices.first(where: { $0.uniqueID == preferredAudioDeviceId }) {
+            device = preferredAudioDevice
+        } else if let discoveredDevice = AVCaptureDevice.default(for: .audio) {
+            device = discoveredDevice
+        } else {
+            throw Error.noDeviceFound
+        }
+
+        let newAudioDeviceInput = try AVCaptureDeviceInput(device: device)
+        self.captureSession.beginConfiguration()
+
+        if let currentAudioDeviceInput = self.audioDeviceInput {
+            self.captureSession.removeInput(currentAudioDeviceInput)
+        }
+        if self.captureSession.canAddInput(newAudioDeviceInput) {
+            self.captureSession.addInput(newAudioDeviceInput)
+            self.audioDeviceInput = newAudioDeviceInput
+        } else {
+            self.captureSession.commitConfiguration()
+            throw Error.cannotAddInput
+        }
+
+        self.captureSession.commitConfiguration()
+    }
+    
     public var audioCaptureConnection: AVCaptureConnection? {
         return self.audioDataOutput?.connection(with: .audio)
     }
@@ -209,23 +260,14 @@ public class Camera {
     public private(set) var audioDataOutput: AVCaptureAudioDataOutput?
 
     public func enableAudioDataOutput(on queue: DispatchQueue = .main, delegate: AVCaptureAudioDataOutputSampleBufferDelegate) throws {
+        assert(self.audioDataOutput == nil)
+        if self.audioDevice == nil {
+            try self.switchToAudioCaptureDevice(preferredAudioDeviceId: self.defaultAudioDeviceUniqueId)
+        }
         self.captureSession.beginConfiguration()
         defer {
             self.captureSession.commitConfiguration()
         }
-        if self.audioDeviceInput == nil {
-            if let device = AVCaptureDevice.default(for: .audio), let audioDeviceInput = try? AVCaptureDeviceInput(device: device) {
-                if self.captureSession.canAddInput(audioDeviceInput) {
-                    self.captureSession.addInput(audioDeviceInput)
-                    self.audioDeviceInput = audioDeviceInput
-                } else {
-                    throw Error.cannotAddInput
-                }
-            } else {
-                throw Error.cannotAddInput
-            }
-        }
-        assert(self.audioDataOutput == nil)
         if let audioOutput = self.audioDataOutput {
             self.captureSession.removeOutput(audioOutput)
         }
@@ -245,11 +287,6 @@ public class Camera {
             self.captureSession.removeOutput(output)
         }
         self.audioDataOutput = nil
-        
-        if let input = self.audioDeviceInput {
-            self.captureSession.removeInput(input)
-        }
-        self.audioDeviceInput = nil
         self.captureSession.commitConfiguration()
     }
     
