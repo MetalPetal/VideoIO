@@ -151,6 +151,23 @@ public class Camera {
         }
     }
     
+    #if os(iOS)
+    public func zoomVideoCaptureDevice(to zoomFactor: CGFloat, withRate rate: Float?) throws {
+        guard let device = videoDeviceInput?.device else { return }
+        do {
+            try device.lockForConfiguration()
+            if let rate = rate {
+                device.ramp(toVideoZoomFactor: zoomFactor, withRate: rate)
+            } else {
+                device.videoZoomFactor = zoomFactor
+            }
+            device.unlockForConfiguration()
+        } catch {
+            throw Error.noDeviceFound
+        }
+    }
+    #endif
+    
     public var videoCaptureConnection: AVCaptureConnection? {
         return self.videoDataOutput?.connection(with: .video)
     }
