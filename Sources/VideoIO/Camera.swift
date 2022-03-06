@@ -253,6 +253,17 @@ public class Camera {
         self.captureSession.commitConfiguration()
     }
     
+    public func removeAudioCaptureDevice() {
+        self.captureSession.beginConfiguration()
+
+        if let currentAudioDeviceInput = self.audioDeviceInput {
+            self.captureSession.removeInput(currentAudioDeviceInput)
+            self.audioDeviceInput = nil
+        }
+        
+        self.captureSession.commitConfiguration()
+    }
+    
     public var audioCaptureConnection: AVCaptureConnection? {
         return self.audioDataOutput?.connection(with: .audio)
     }
