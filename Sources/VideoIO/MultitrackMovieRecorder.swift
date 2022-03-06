@@ -71,10 +71,13 @@ public final class MultitrackMovieRecorder {
         
         public var shouldOptimizeForNetworkUse: Bool
         
-        public init(videoTrackCount: Int, audioTrackCount: Int, optimizeForNetworkUse: Bool = true) {
+        public var hasUnalignedAudio: Bool
+        
+        public init(videoTrackCount: Int, audioTrackCount: Int, optimizeForNetworkUse: Bool = true, unalignedAudio: Bool = false) {
             numberOfVideoTracks = videoTrackCount
             numberOfAudioTracks = audioTrackCount
             shouldOptimizeForNetworkUse = optimizeForNetworkUse
+            hasUnalignedAudio = unalignedAudio
         }
     }
     
@@ -116,6 +119,7 @@ public final class MultitrackMovieRecorder {
     
     private var lastVideoSampleTime: CMTime = .invalid
     private var recordingStartSampleTime: CMTime = .invalid
+    private var audioSampleTimeDelta: CMTime = .invalid
     
     public let configuration: Configuration
     
@@ -332,10 +336,22 @@ public final class MultitrackMovieRecorder {
                 return
             }
             
+            let audioPresentationTime: CMTime
+            if self.configuration.hasUnalignedAudio {
+                if !self.audioSampleTimeDelta.isValid && self.recordingStartSampleTime.isValid {
+                    self.audioSampleTimeDelta = self.recordingStartSampleTime - presentationTime
+                }
+                
+                guard self.audioSampleTimeDelta.isValid else { return }
+                audioPresentationTime = presentationTime + self.audioSampleTimeDelta
+            } else {
+                audioPresentationTime = presentationTime
+            }
+            
             if self.assetWriter.status == .writing {
                 do {
                     try self.tryAppendingPendingAudioBuffers()
-                    try self.tryAppendingAudioSampleBufferGroup(SampleBufferGroup(sampleBuffers: sampleBuffers, presentationTimeStamp: presentationTime, duration: duration))
+                    try self.tryAppendingAudioSampleBufferGroup(SampleBufferGroup(sampleBuffers: sampleBuffers, presentationTimeStamp: audioPresentationTime, duration: duration))
                 } catch {
                     self.transitionToFailedStatus(error: error)
                     return
@@ -444,7 +460,16 @@ public final class MultitrackMovieRecorder {
     private func appendAudioSampleBufferGroup(_ group: SampleBufferGroup) throws {
         if self.audioInputs.map(\.isReadyForMoreMediaData).reduce(true, { $0 && $1 }) {
             for (index, audioInput) in self.audioInputs.enumerated() {
-                if !audioInput.append(group.sampleBuffers[index]) {
+                let buffer = group.sampleBuffers[index]
+                let presentationBuffer: CMSampleBuffer
+                
+                if #available(iOS 13.0, tvOS 13.0, macOS 10.15, *) {
+                    presentationBuffer = self.audioSampleTimeDelta.isValid ? setTimeStamp(buffer, newTime: buffer.presentationTimeStamp+self.audioSampleTimeDelta) : buffer
+                } else {
+                    presentationBuffer = buffer
+                }
+                
+                if !audioInput.append(presentationBuffer) {
                     if let error = self.assetWriter.error {
                         throw error
                     }
@@ -453,6 +478,22 @@ public final class MultitrackMovieRecorder {
         } else {
             print("Audio inputs: not ready for media data, dropping sample buffer (t: \(group.presentationTimeStamp)).")
         }
+    }
+    
+    private func setTimeStamp(_ sample: CMSampleBuffer, newTime: CMTime) -> CMSampleBuffer {
+        var count: CMItemCount = 0
+        CMSampleBufferGetSampleTimingInfoArray(sample, entryCount: 0, arrayToFill: nil, entriesNeededOut: &count)
+        var info = [CMSampleTimingInfo](repeating: CMSampleTimingInfo(duration: CMTimeMake(value: 0, timescale: 0), presentationTimeStamp: CMTimeMake(value: 0, timescale: 0), decodeTimeStamp: CMTimeMake(value: 0, timescale: 0)), count: count)
+        CMSampleBufferGetSampleTimingInfoArray(sample, entryCount: count, arrayToFill: &info, entriesNeededOut: &count)
+        
+        for i in 0..<count {
+            info[i].decodeTimeStamp = newTime
+            info[i].presentationTimeStamp = newTime
+        }
+        
+        var out: CMSampleBuffer?
+        CMSampleBufferCreateCopyWithNewTiming(allocator: nil, sampleBuffer: sample, sampleTimingEntryCount: count, sampleTimingArray: &info, sampleBufferOut: &out)
+        return out!
     }
     
     private func transitionToFailedStatus(error: Error) {
@@ -525,9 +566,13 @@ public final class MovieRecorder {
         /// Set to `true` to write the file in a way that is more suitable for playback over a network.
         public var shouldOptimizeForNetworkUse: Bool
         
-        public init(hasAudio: Bool, optimizeForNetworkUse: Bool = true) {
+        /// Set to `true` to align audio sample buffer times (useful when the source video/audio frameworks differ).
+        public var hasUnalignedAudio: Bool
+        
+        public init(hasAudio: Bool, optimizeForNetworkUse: Bool = true, unalignedAudio: Bool = false) {
             self.hasAudio = hasAudio
             self.shouldOptimizeForNetworkUse = optimizeForNetworkUse
+            self.hasUnalignedAudio = unalignedAudio
         }
     }
     
@@ -535,7 +580,7 @@ public final class MovieRecorder {
     
     public init(url: URL, configuration: Configuration) throws {
         self.configuration = configuration
-        var internalConfiguration = MultitrackMovieRecorder.Configuration(videoTrackCount: 1, audioTrackCount: configuration.hasAudio ? 1 : 0, optimizeForNetworkUse: configuration.shouldOptimizeForNetworkUse)
+        var internalConfiguration = MultitrackMovieRecorder.Configuration(videoTrackCount: 1, audioTrackCount: configuration.hasAudio ? 1 : 0, optimizeForNetworkUse: configuration.shouldOptimizeForNetworkUse, unalignedAudio: configuration.hasUnalignedAudio)
         internalConfiguration.metadata = configuration.metadata
         internalConfiguration.videoOrientation = configuration.videoOrientation
         internalConfiguration.videoSettings = configuration.videoSettings
