@@ -17,6 +17,7 @@ public class Camera {
         case cannotAddInput
         case cannotAddOutput
         case metadataObjectTypeNotAvailable
+        case noRequiredMediaTypeFoundOnDevice
     }
     
     public struct Configurator {
@@ -125,32 +126,40 @@ public class Camera {
         }
         let discoverySession = AVCaptureDevice.DiscoverySession(deviceTypes: deviceTypes, mediaType: .video, position: position)
         if let device = discoverySession.devices.first {
-            let newVideoDeviceInput = try AVCaptureDeviceInput(device: device)
-            self.captureSession.beginConfiguration()
-            if let currentVideoDeviceInput = self.videoDeviceInput {
-                self.captureSession.removeInput(currentVideoDeviceInput)
-            }
-            if self.captureSession.canAddInput(newVideoDeviceInput) {
-                self.captureSession.addInput(newVideoDeviceInput)
-                self.videoDeviceInput = newVideoDeviceInput
-            } else {
-                self.captureSession.commitConfiguration()
-                throw Error.cannotAddInput
-            }
-                        
-            if let connection = self.videoCaptureConnection {
-                self.configurator.videoConnectionConfigurator(self, connection)
-            }
-            self.captureSession.commitConfiguration()
-            
-            try device.lockForConfiguration()
-            self.configurator.videoDeviceConfigurator(self, device)
-            device.unlockForConfiguration()
+            try self.switchToVideoCaptureDevice(device)
         } else {
             throw Error.noDeviceFound
         }
     }
     
+    public func switchToVideoCaptureDevice(_ device: AVCaptureDevice) throws {
+        guard device.hasMediaType(.video) else {
+            throw Error.noRequiredMediaTypeFoundOnDevice
+        }
+        
+        let newVideoDeviceInput = try AVCaptureDeviceInput(device: device)
+        self.captureSession.beginConfiguration()
+        if let currentVideoDeviceInput = self.videoDeviceInput {
+            self.captureSession.removeInput(currentVideoDeviceInput)
+        }
+        if self.captureSession.canAddInput(newVideoDeviceInput) {
+            self.captureSession.addInput(newVideoDeviceInput)
+            self.videoDeviceInput = newVideoDeviceInput
+        } else {
+            self.captureSession.commitConfiguration()
+            throw Error.cannotAddInput
+        }
+        
+        if let connection = self.videoCaptureConnection {
+            self.configurator.videoConnectionConfigurator(self, connection)
+        }
+        self.captureSession.commitConfiguration()
+        
+        try device.lockForConfiguration()
+        self.configurator.videoDeviceConfigurator(self, device)
+        device.unlockForConfiguration()
+    }
+  
     public func removeVideoCaptureDevice() {
         self.captureSession.beginConfiguration()
 

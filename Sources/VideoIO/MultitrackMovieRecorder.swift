@@ -69,9 +69,19 @@ public final class MultitrackMovieRecorder {
         
         public var numberOfAudioTracks: Int
         
-        public init(videoTrackCount: Int, audioTrackCount: Int) {
+        public var shouldOptimizeForNetworkUse: Bool
+        
+        @available(*, deprecated, renamed: "init(numberOfVideoTracks:numberOfAudioTracks:shouldOptimizeForNetworkUse:)")
+        public init(videoTrackCount: Int, audioTrackCount: Int, optimizeForNetworkUse: Bool = true) {
             numberOfVideoTracks = videoTrackCount
             numberOfAudioTracks = audioTrackCount
+            shouldOptimizeForNetworkUse = optimizeForNetworkUse
+        }
+        
+        public init(numberOfVideoTracks: Int, numberOfAudioTracks: Int, shouldOptimizeForNetworkUse: Bool = true) {
+            self.numberOfAudioTracks = numberOfAudioTracks
+            self.numberOfVideoTracks = numberOfVideoTracks
+            self.shouldOptimizeForNetworkUse = shouldOptimizeForNetworkUse
         }
     }
     
@@ -135,7 +145,7 @@ public final class MultitrackMovieRecorder {
         try? fileManager.removeItem(at: url)
         self.assetWriter = try AVAssetWriter(url: url, fileType: fileType)
         self.assetWriter.metadata = self.configuration.metadata
-        self.assetWriter.shouldOptimizeForNetworkUse = true
+        self.assetWriter.shouldOptimizeForNetworkUse = configuration.shouldOptimizeForNetworkUse
     }
     
     private func checkError() throws {
@@ -519,8 +529,12 @@ public final class MovieRecorder {
         /// Set to `true` to record both video and audio.
         public var hasAudio: Bool
         
-        public init(hasAudio: Bool) {
+        /// Set to `true` to write the file in a way that is more suitable for playback over a network.
+        public var shouldOptimizeForNetworkUse: Bool
+        
+        public init(hasAudio: Bool, shouldOptimizeForNetworkUse: Bool = true) {
             self.hasAudio = hasAudio
+            self.shouldOptimizeForNetworkUse = shouldOptimizeForNetworkUse
         }
     }
     
@@ -528,7 +542,7 @@ public final class MovieRecorder {
     
     public init(url: URL, configuration: Configuration) throws {
         self.configuration = configuration
-        var internalConfiguration = MultitrackMovieRecorder.Configuration(videoTrackCount: 1, audioTrackCount: configuration.hasAudio ? 1 : 0)
+        var internalConfiguration = MultitrackMovieRecorder.Configuration(numberOfVideoTracks: 1, numberOfAudioTracks: configuration.hasAudio ? 1 : 0, shouldOptimizeForNetworkUse: configuration.shouldOptimizeForNetworkUse)
         internalConfiguration.metadata = configuration.metadata
         internalConfiguration.videoOrientation = configuration.videoOrientation
         internalConfiguration.videoSettings = configuration.videoSettings
