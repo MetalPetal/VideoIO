@@ -159,6 +159,17 @@ public class Camera {
         self.configurator.videoDeviceConfigurator(self, device)
         device.unlockForConfiguration()
     }
+  
+    public func removeVideoCaptureDevice() {
+        self.captureSession.beginConfiguration()
+
+        if let currentVideoDeviceInput = self.videoDeviceInput {
+            self.captureSession.removeInput(currentVideoDeviceInput)
+            self.videoDeviceInput = nil
+        }
+        
+        self.captureSession.commitConfiguration()
+    }
     
     public var videoCaptureConnection: AVCaptureConnection? {
         return self.videoDataOutput?.connection(with: .video)
